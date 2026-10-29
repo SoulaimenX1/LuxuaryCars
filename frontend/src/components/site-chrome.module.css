@@ -1,0 +1,707 @@
+/* ==============================================================
+   LUXURY CARS — SITE CHROME (HEADER & FOOTER)
+   Maison 2027 · Ultra-Luxury Identity (Rolls-Royce / Patek Philippe)
+   ============================================================== */
+
+/* ==============================================================
+   HEADER
+   ============================================================== */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  transition: background-color var(--dur-2) var(--ease-lux), border-color var(--dur-2) var(--ease-lux), box-shadow var(--dur-2) var(--ease-lux);
+}
+
+.headerInner {
+  width: min(calc(100% - 2 * var(--gutter)), var(--container));
+  min-height: 82px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: clamp(16px, 2vw, 28px);
+}
+
+/* ---------- Marque ---------- */
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 13px;
+  text-decoration: none;
+  color: var(--ink);
+  white-space: nowrap;
+  transition: opacity var(--dur-1) var(--ease-lux);
+}
+
+.brand:hover {
+  opacity: .88;
+}
+
+.brandMark {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #b9a06c;
+  color: #b9a06c;
+  font-family: var(--sans);
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: 0;
+  background: var(--white);
+  box-shadow: none;
+  transition:
+    border-color var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux);
+}
+
+.brand:hover .brandMark {
+  border-color: var(--champagne);
+  color: var(--champagne);
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: inset 0 1px 0 #fff, 0 4px 14px -3px var(--card-glow);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.brandText strong {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  line-height: 1.1;
+}
+
+.brandText em {
+  font-style: normal;
+  color: #b9a06c;
+}
+
+.brandText small {
+  color: var(--muted);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* ---------- Navigation ---------- */
+
+.navigation {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: clamp(18px, 2.2vw, 34px);
+}
+
+.navigation a {
+  position: relative;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 10px 0;
+  transition: color var(--dur-1) var(--ease-lux);
+}
+
+.navigation a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  height: 1px;
+  background: var(--champagne);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--dur-2) var(--ease-lux);
+}
+
+.navigation a:hover {
+  color: var(--ink);
+}
+
+.navigation a:hover::after {
+  transform: scaleX(1);
+}
+
+.navigation a.activeLink {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.navigation a.activeLink::after {
+  transform: scaleX(1);
+}
+
+/* ---------- Actions d'en-tête ---------- */
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  gap: clamp(8px, 0.9vw, 12px);
+}
+
+.signIn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  padding: 0 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  transition: color var(--dur-1) var(--ease-lux);
+}
+
+.signIn:hover {
+  color: var(--ink);
+}
+
+.accountButton,
+.activeActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  box-shadow: inset 0 1px 0 var(--surface-highlight);
+  transition:
+    background var(--dur-1) var(--ease-lux),
+    border-color var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux),
+    transform var(--dur-1) var(--ease-lux),
+    box-shadow var(--dur-1) var(--ease-lux);
+}
+
+.activeActionButton {
+  border-color: var(--champagne);
+  background: var(--white);
+}
+
+.accountButton:hover,
+.activeActionButton:hover {
+  border-color: var(--ink);
+  background: var(--white);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 #fff, var(--shadow-soft);
+}
+
+.reservationsButton,
+.adminDashboardButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--ivory);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: var(--radius-button);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), 0 4px 14px -4px rgba(0, 0, 0, 0.25);
+  transition:
+    background var(--dur-1) var(--ease-lux),
+    border-color var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux),
+    transform var(--dur-1) var(--ease-lux),
+    box-shadow var(--dur-1) var(--ease-lux);
+}
+
+.adminDashboardButton {
+  border-color: var(--champagne-line);
+}
+
+.reservationsButton:hover,
+.adminDashboardButton:hover {
+  background: transparent;
+  border-color: var(--ink);
+  color: var(--ink);
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 var(--surface-highlight), var(--shadow-soft);
+}
+
+:global(html[data-theme="dark"]) .reservationsButton,
+:global(html[data-theme="dark"]) .adminDashboardButton {
+  background: linear-gradient(135deg, #dfc593 0%, #c4a46a 50%, #9e7f45 100%);
+  color: #08080a;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 18px rgba(196, 164, 106, 0.35);
+}
+
+:global(html[data-theme="dark"]) .reservationsButton:hover,
+:global(html[data-theme="dark"]) .adminDashboardButton:hover {
+  background: linear-gradient(135deg, #edd6ad 0%, #d4b57e 50%, #b29053 100%);
+  color: #08080a;
+  border-color: #dfc593;
+  box-shadow: 0 6px 24px rgba(196, 164, 106, 0.45);
+}
+
+:global(html[data-theme="dark"]) .accountButton {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(253, 250, 243, 0.16);
+  color: #fdfaf3;
+}
+
+:global(html[data-theme="dark"]) .accountButton:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--champagne);
+  color: var(--champagne-3);
+}
+
+:global(html[data-theme="dark"]) .activeActionButton {
+  background: rgba(204, 177, 129, 0.12);
+  border-color: var(--champagne);
+  color: var(--champagne-3);
+}
+
+.signOut {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: var(--radius-button);
+  transition:
+    border-color var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux);
+}
+
+.signOut:hover:not(:disabled) {
+  border-color: var(--danger-line);
+  color: var(--danger-text);
+}
+
+.signOut:disabled {
+  opacity: .5;
+  cursor: wait;
+}
+
+/* ==============================================================
+   FOOTER (ULTRA-LUXE — OBSIDIENNE ARCHITECTURALE)
+   ============================================================== */
+
+.footer {
+  background: var(--noir);
+  color: #fdfaf3;
+  border-top: 1px solid rgba(245, 242, 235, .08);
+  position: relative;
+  overflow: hidden;
+}
+
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--gold-rule);
+  opacity: .4;
+  pointer-events: none;
+}
+
+.footerMain {
+  width: min(calc(100% - 2 * var(--gutter)), var(--container));
+  margin: 0 auto;
+  padding: clamp(64px, 8vw, 96px) 0 clamp(40px, 5vw, 64px);
+}
+
+/* ---------- Ligne de marque supérieure ---------- */
+
+.footerBrandRow {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+}
+
+.footerBrandLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  text-decoration: none;
+  color: #fdfaf3;
+  transition: opacity var(--dur-1) var(--ease-lux);
+}
+
+.footerBrandLink:hover {
+  opacity: .9;
+}
+
+.footerBrandMark {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(200, 173, 126, .35);
+  color: var(--champagne-3);
+  font-family: var(--sans);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, .03);
+}
+
+.footerBrandTitle {
+  font-family: var(--sans);
+  font-size: clamp(22px, 2.8vw, 30px);
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.footerBrandTitle em {
+  font-style: normal;
+  color: var(--champagne-3);
+}
+
+.footerMotto {
+  color: rgba(245, 242, 235, .55);
+  font-size: 13.5px;
+  font-family: var(--sans);
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.6;
+  text-align: right;
+  letter-spacing: .02em;
+}
+
+.footerDivider {
+  width: 100%;
+  height: 1px;
+  margin: clamp(36px, 5vw, 54px) 0 clamp(44px, 6vw, 64px);
+  background: rgba(245, 242, 235, .08);
+}
+
+/* ---------- Grille à 4 colonnes ---------- */
+
+.footerTop {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+  gap: clamp(32px, 5vw, 64px);
+}
+
+.footerColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+.footerColumn strong {
+  margin-bottom: 8px;
+  color: var(--champagne-3);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .24em;
+  text-transform: uppercase;
+}
+
+.footerColumn a {
+  position: relative;
+  color: rgba(245, 242, 235, .7);
+  font-size: 13px;
+  letter-spacing: .02em;
+  transition: color var(--dur-1) var(--ease-lux);
+}
+
+.footerColumn a::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: var(--champagne-3);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--dur-2) var(--ease-lux);
+}
+
+.footerColumn a:hover {
+  color: #fdfaf3;
+}
+
+.footerColumn a:hover::after {
+  transform: scaleX(1);
+}
+
+/* Détails agence */
+
+.agencyAddress {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  color: rgba(245, 242, 235, .7);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.agencyContact {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.contactItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(245, 242, 235, .8) !important;
+  font-size: 12.5px !important;
+}
+
+.contactItem:hover {
+  color: var(--champagne-3) !important;
+}
+
+.contactIcon {
+  color: var(--champagne-3);
+  font-size: 11px;
+}
+
+.agencyHours {
+  margin-top: 4px;
+  color: rgba(245, 242, 235, .45);
+  font-size: 11.5px;
+  letter-spacing: .04em;
+}
+
+/* Manifeste & badge excellence */
+
+.manifesto {
+  color: rgba(245, 242, 235, .6);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.assuranceBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  border: 1px solid rgba(200, 173, 126, .25);
+  border-radius: var(--radius-field);
+  background: rgba(200, 173, 126, .06);
+  color: var(--champagne-3);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.assuranceDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-bg);
+}
+
+/* ---------- Clôture inférieure ---------- */
+
+.footerBottomWrap {
+  border-top: 1px solid rgba(245, 242, 235, .08);
+  background: rgba(0, 0, 0, .25);
+}
+
+.footerBottom {
+  width: min(calc(100% - 2 * var(--gutter)), var(--container));
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 24px 0 30px;
+  color: rgba(245, 242, 235, .45);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.footerBottomCenter {
+  color: rgba(245, 242, 235, .6);
+}
+
+/* ==============================================================
+   RESPONSIVE
+   ============================================================== */
+
+@media (max-width: 1120px) {
+  .headerInner {
+    flex-wrap: wrap;
+    padding: 12px 0;
+    gap: 12px 16px;
+  }
+
+  .navigation {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: center;
+    padding-top: 10px;
+    border-top: 1px solid var(--line-soft);
+    gap: 24px;
+  }
+
+  .headerActions {
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .footerBrandRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .footerMotto {
+    text-align: left;
+  }
+
+  .footerTop {
+    grid-template-columns: 1fr 1fr;
+    gap: 40px 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .headerInner {
+    min-height: 68px;
+    padding: 10px 0;
+    gap: 10px;
+  }
+
+  .brandMark {
+    width: 34px;
+    height: 34px;
+    font-size: 17px;
+  }
+
+  .brandText strong {
+    font-size: 12px;
+    letter-spacing: .18em;
+  }
+
+  .brandText small {
+    display: none;
+  }
+
+  .headerActions {
+    width: 100%;
+    order: 2;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 8px;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .navigation {
+    order: 3;
+    flex: 1 0 100%;
+    justify-content: space-around;
+    padding-top: 8px;
+    gap: 12px;
+  }
+
+  .signIn,
+  .accountButton,
+  .activeActionButton,
+  .reservationsButton,
+  .adminDashboardButton,
+  .signOut {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 10px;
+    letter-spacing: .1em;
+  }
+
+  .footerMain {
+    padding: 48px 0 32px;
+  }
+
+  .footerBrandTitle {
+    font-size: 22px;
+    letter-spacing: .18em;
+  }
+
+  .footerTop {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  .footerBottom {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.6;
+  }
+}
+
+
+

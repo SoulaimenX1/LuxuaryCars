@@ -1,0 +1,190 @@
+/* ==================================================================
+   HAUTE HORLOGERIE SCROLL EXPERIENCE — MODULE CSS
+   ================================================================== */
+
+/* 1. Jauge de progression chronographique supérieure */
+.progressGauge {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2.5px;
+  z-index: 99999;
+  pointer-events: none;
+  background: transparent;
+  overflow: visible;
+}
+
+.progressBar {
+  height: 100%;
+  width: 100%;
+  transform-origin: 0% 50%;
+  background: var(--scroll-progress-gradient);
+  box-shadow: var(--scroll-progress-glow);
+  position: relative;
+  transition: transform 90ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+/* Tête de lecture bijou (diamant spéculaire qui glisse avec le défilement) */
+.beacon {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translate(50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.9),
+    0 0 8px 2px var(--champagne),
+    0 0 18px 4px var(--champagne-2);
+  animation: beacon-pulse 2.2s infinite ease-in-out;
+}
+
+@keyframes beacon-pulse {
+  0%, 100% {
+    transform: translate(50%, -50%) scale(1);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.9),
+      0 0 8px 2px var(--champagne),
+      0 0 18px 4px var(--champagne-2);
+  }
+  50% {
+    transform: translate(50%, -50%) scale(1.3);
+    box-shadow:
+      0 0 0 1.5px #ffffff,
+      0 0 12px 3px var(--champagne),
+      0 0 24px 6px rgba(226, 201, 155, 0.7);
+  }
+}
+
+/* 2. Orbe de retour au sommet (Ascend Orb) */
+.ascendOrb {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 900;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-button);
+  background: var(--surface-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--champagne-line);
+  box-shadow:
+    inset 0 1px 0 var(--surface-highlight),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    var(--shadow-luxe);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(18px) scale(0.92);
+  pointer-events: none;
+  transition:
+    opacity 350ms var(--ease-lux),
+    transform 350ms var(--ease-lux),
+    border-color var(--dur-2) var(--ease-lux),
+    box-shadow var(--dur-2) var(--ease-lux),
+    background var(--dur-2) var(--ease-lux);
+  overflow: hidden;
+  user-select: none;
+}
+
+.ascendOrbVisible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+
+/* Éclat miroir spéculaire au survol de l'orbe */
+.ascendOrb::before {
+  content: '';
+  position: absolute;
+  inset: -100%;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 65%
+  );
+  opacity: 0;
+  transform: translateX(-100%);
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+.ascendOrb:hover::before {
+  opacity: 1;
+  animation: mirror-shimmer 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.ascendOrb:hover {
+  transform: translateY(-3px) scale(1.06);
+  border-color: var(--champagne);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 0 20px -3px var(--champagne),
+    var(--shadow-haute);
+  color: var(--gold-text);
+}
+
+.ascendOrb:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.orbIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--dur-2) var(--ease-lux);
+}
+
+.ascendOrb:hover .orbIcon {
+  transform: translateY(-2px);
+}
+
+.orbLabel {
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  line-height: 1;
+  margin-top: 1px;
+  transition: color var(--dur-2) var(--ease-lux);
+}
+
+.ascendOrb:hover .orbLabel {
+  color: var(--gold-text);
+}
+
+@media (max-width: 640px) {
+  .ascendOrb {
+    bottom: 20px;
+    right: 18px;
+    width: 42px;
+    height: 42px;
+  }
+  .progressGauge {
+    height: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressBar {
+    transition: none !important;
+  }
+  .beacon {
+    animation: none !important;
+  }
+  .ascendOrb::before {
+    animation: none !important;
+  }
+}

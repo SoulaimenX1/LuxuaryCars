@@ -1,0 +1,291 @@
+/* ==============================================================
+   LUXUAR — RENTAL & AUDIT HISTORY
+   Maison 2027 · Ultra-Luxury Identity (Rolls-Royce / Patek Philippe)
+   ============================================================== */
+
+.page {
+  padding: 40px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .page {
+    padding: 24px 16px;
+  }
+}
+
+.headerBlock {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--champagne-2);
+  margin-bottom: 8px;
+}
+
+.title {
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 400;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.statCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.statLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+
+.statValue {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.controlsRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterPill {
+  height: 40px;
+  padding: 0 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.filterPillActive {
+  background: var(--ink);
+  color: var(--ivory);
+  border-color: var(--ink);
+}
+
+:global(html[data-theme="dark"]) .filterPillActive {
+  background: linear-gradient(135deg, #dfc593 0%, #c4a46a 50%, #9e7f45 100%);
+  color: #08080a;
+  border-color: #dfc593;
+  box-shadow: 0 0 16px rgba(196, 164, 106, 0.35);
+}
+
+.searchInput {
+  height: 40px;
+  min-width: 280px;
+  padding: 0 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  color: var(--ink);
+  font-size: 13px;
+  outline: none;
+}
+
+.searchInput:focus {
+  border-color: var(--champagne);
+}
+
+/* History Cards */
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.historyCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow-subtle);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.cardTitle {
+  font-family: var(--serif);
+  font-size: 18px;
+  color: var(--ink);
+  margin: 0;
+}
+
+.resRef {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.statusPill {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 4px 10px;
+  border-radius: var(--radius-field);
+}
+
+.statusCompleted {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.statusCancelled {
+  background: rgba(220, 38, 38, 0.12);
+  color: #ef4444;
+}
+
+.statusRejected {
+  background: rgba(140, 140, 140, 0.12);
+  color: var(--muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 16px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.itemLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted-2);
+}
+
+.itemValue {
+  font-size: 13.5px;
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.refundBox {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.reasonNote {
+  font-size: 12px;
+  color: var(--ink);
+  margin-top: 4px;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.linkButton {
+  color: var(--champagne-2);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 72px 24px;
+  background: var(--white);
+  border: 1px solid var(--champagne-line);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 1px 0 var(--surface-highlight), var(--shadow-soft);
+  position: relative;
+}
+
+.emptyState::before {
+  content: '';
+  display: block;
+  width: 36px;
+  height: 1px;
+  background: var(--champagne);
+  margin: 0 auto 20px auto;
+}

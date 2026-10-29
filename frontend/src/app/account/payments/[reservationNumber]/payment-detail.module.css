@@ -1,0 +1,723 @@
+/* ==============================================================
+   LUXUAR — PAYMENT DETAIL & CHECKOUT EXPERIENCE
+   Luxury Haute Horlogerie aesthetic · 100% Rectangular Geometry
+   ============================================================== */
+
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 40px 24px 80px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  margin-bottom: 28px;
+  transition: color 0.15s ease;
+}
+
+.backLink:hover {
+  color: var(--gold);
+}
+
+/* ==============================================================
+   HEADER HERO
+   ============================================================== */
+
+.hero {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 24px;
+  margin-bottom: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.eyebrow {
+  display: block;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+.title {
+  font-family: var(--serif);
+  font-size: clamp(28px, 3.5vw, 42px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  margin: 0 0 6px;
+}
+
+.subtitle {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.statusTag {
+  display: inline-block;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 8px 18px;
+  border-radius: var(--radius-field);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.statusAwaiting {
+  border-color: #f59e0b;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.statusRequested {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(184, 151, 106, 0.12);
+}
+
+.statusConfirmed {
+  border-color: var(--success);
+  color: var(--success);
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.statusRejected {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* ==============================================================
+   ALERT / NOTICE BANNERS
+   ============================================================== */
+
+.bannerSuccess {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid var(--success);
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+  color: var(--success);
+  font-size: 13px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bannerWarning {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+  color: #f59e0b;
+  font-size: 13px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bannerError {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-card);
+  padding: 16px 20px;
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 24px;
+}
+
+/* ==============================================================
+   TWO-COLUMN MAIN GRID
+   ============================================================== */
+
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 36px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==============================================================
+   LEFT COLUMN: PAYMENT OPTIONS & FORMS
+   ============================================================== */
+
+.paymentStage {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.methodSelectorGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .methodSelectorGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.methodCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 22px 20px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.methodCard:hover {
+  border-color: var(--gold);
+  background: var(--surface-hover);
+}
+
+.methodCardActive {
+  border-color: var(--gold);
+  background: var(--surface-hover);
+  box-shadow: 0 0 0 1px var(--gold);
+}
+
+.methodBadge {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.methodTitle {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0;
+}
+
+.methodDesc {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Option Form Panels */
+.formPanel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 28px;
+}
+
+.panelHeader {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.panelTitle {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0;
+}
+
+.secureBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  padding: 4px 10px;
+  border-radius: var(--radius-field);
+}
+
+/* Card Inputs Layout */
+.cardForm {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.input {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  border-color: var(--gold);
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 500px) {
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quickFillBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(184, 151, 106, 0.08);
+  border: 1px dashed var(--gold);
+  border-radius: var(--radius-field);
+  padding: 10px 14px;
+  font-size: 12px;
+}
+
+.quickFillBtn {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  background: var(--gold);
+  color: #0b0c10;
+  border: none;
+  border-radius: var(--radius-button);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.quickFillBtn:hover {
+  opacity: 0.9;
+}
+
+.payButton {
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: var(--gold);
+  color: #0b0c10;
+  border: none;
+  border-radius: var(--radius-button);
+  padding: 16px 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  margin-top: 8px;
+}
+
+.payButton:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.payButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondaryAction {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-top: 6px;
+}
+
+.secondaryAction:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+/* ==============================================================
+   OPTION B: AGENCY MANUAL PAYMENT VIEW
+   ============================================================== */
+
+.agencyNotice {
+  background: rgba(184, 151, 106, 0.06);
+  border-left: 2px solid var(--gold);
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.agencySelect {
+  font-family: var(--sans);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  padding: 12px 14px;
+  outline: none;
+  cursor: pointer;
+}
+
+.agencySelect:focus {
+  border-color: var(--gold);
+}
+
+.statusCallout {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.statusCalloutTitle {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusMetaList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  font-size: 13px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.statusMetaList dt {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.statusMetaList dd {
+  color: var(--ink);
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ==============================================================
+   RIGHT COLUMN: FINANCIAL SUMMARY SIDEBAR
+   ============================================================== */
+
+.sidebarCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  position: sticky;
+  top: 32px;
+}
+
+.vehicleMedia {
+  height: 200px;
+  width: 100%;
+  background: #0b0c10;
+  overflow: hidden;
+  position: relative;
+}
+
+.vehicleImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vehicleFallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold);
+  font-family: var(--serif);
+  font-size: 24px;
+  letter-spacing: 0.1em;
+}
+
+.sidebarContent {
+  padding: 24px;
+}
+
+.vehicleHead {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+}
+
+.vehicleName {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+
+.rentalDates {
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* Countdown Clock Box */
+.countdownBox {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.countdownLabel {
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f59e0b;
+}
+
+.countdownDigits {
+  font-family: var(--mono, monospace);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.06em;
+}
+
+/* Breakdown List */
+.breakdownList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.breakdownRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+}
+
+.breakdownRow strong {
+  color: var(--ink);
+}
+
+.totalRow {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.totalLabel {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.totalValue {
+  font-family: var(--serif);
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--gold);
+}
+
+/* Security Deposit Information */
+.depositCallout {
+  background: rgba(184, 151, 106, 0.06);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.depositCallout strong {
+  color: var(--gold);
+  display: block;
+  margin-bottom: 2px;
+}
+
+/* ==============================================================
+   TRANSACTION HISTORY
+   ============================================================== */
+
+.transactionsSection {
+  margin-top: 36px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 28px;
+}
+
+.transactionsTitle {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 16px;
+}
+
+.txList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.txItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 18px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-field);
+}
+
+.txType {
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: capitalize;
+  color: var(--ink);
+  display: block;
+}
+
+.txMeta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.txAmount {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--gold);
+}
+
+.receiptButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  padding: 6px 14px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.receiptButton:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}

@@ -1,0 +1,653 @@
+import type { PremiumService } from '../premium/premium.service.js';
+import type { AvailabilityService } from '../availability/availability.service.js';
+
+import {
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+} from 'vitest';
+
+import {
+    BadRequestException,
+    ConflictException,
+} from '@nestjs/common';
+
+import type {
+    DataSource,
+    Repository,
+} from 'typeorm';
+
+// Service que nous voulons tester.
+import {
+    ReservationsService,
+} from './reservations.service.js';
+
+// Entités utilisées par le service.
+import {
+    CustomerProfile,
+} from '../customer-profiles/entities/customer-profile.entity.js';
+
+import {
+    Reservation,
+    ReservationStatus,
+} from './entities/reservation.entity.js';
+import {checkInCodeHash} from '../rentals/check-in-code.js';
+
+// DTO utilisé pour créer une réservation.
+import {
+    CreateReservationDto,
+} from './dto/create-reservation.dto.js';
+
+describe('ReservationsService', () => {
+    // Faux repository du profil client.
+    let profilesRepository: {
+        findOne: ReturnType<typeof vi.fn>;
+    };
+
+    // Faux repository utilisé dans la transaction.
+    let transactionRepository: {
+        create: ReturnType<typeof vi.fn>;
+        save: ReturnType<typeof vi.fn>;
+        findOne: ReturnType<typeof vi.fn>;
+    };
+
+    // Faux gestionnaire PostgreSQL.
+    let manager: {
+        query: ReturnType<typeof vi.fn>;
+        getRepository: ReturnType<typeof vi.fn>;
+    };
+
+    // Fausse connexion PostgreSQL.
+    let dataSource: {
+        transaction: ReturnType<typeof vi.fn>;
+        query: ReturnType<typeof vi.fn>;
+    };
+
+    // Service que nous allons tester.
+    let service: ReservationsService;
+
+    // Informations fictives d'une réservation.
+    let dto: CreateReservationDto;
+
+    // Acces direct au faux service de disponibilite pour les tests.
+    let availabilityCheck: ReturnType<typeof vi.fn> = vi.fn();
+
+    beforeEach(() => {
+        // ========================================
+        // 1. PRÉPARER LA DEMANDE DU CLIENT
+        // ========================================
+
+        dto = {
+            vehicleId: '550e8400-e29b-41d4-a716-446655440000',
+            // Contrat autoritaire : instants precis + lieu de prise en
+            // charge obligatoire (plus de dates reduites a minuit UTC).
+            pickupAt: '2035-11-25T00:00:00.000Z',
+            returnAt: '2035-11-28T00:00:00.000Z',
+            customerNotes: 'Réservation de test',
+        };
+
+        // ========================================
+        // 2. SIMULER UN PROFIL CLIENT COMPLET
+        // ========================================
+
+        profilesRepository = {
+            findOne: vi.fn().mockResolvedValue({
+                userId: 'customer-test-id',
+
+                // Le permis est valide pendant
+                // toute la période de location.
+                licenseExpiresOn: '2040-12-31',
+            } as CustomerProfile),
+        };
+
+        // ========================================
+        // 3. SIMULER LA TABLE RESERVATIONS
+        // ========================================
+
+        // Cette variable représente une réservation
+        // enregistrée par le faux repository.
+        let storedReservation:
+            Reservation | null = null;
+
+        transactionRepository = {
+            // Préparer une réservation fictive.
+            create: vi.fn(
+                (values: Partial<Reservation>) => ({
+                    id: 'reservation-test-id',
+                    ...values,
+                } as Reservation),
+            ),
+
+            // Simuler son enregistrement.
+            save: vi.fn(
+                async (reservation: Reservation) => {
+                    storedReservation = reservation;
+
+                    return reservation;
+                },
+            ),
+
+            // Simuler sa relecture après création.
+            findOne: vi.fn(
+                async () => storedReservation,
+            ),
+        };
+
+        // ========================================
+        // 4. SIMULER UNE VOITURE DISPONIBLE
+        // ========================================
+
+        manager = {
+            // Simuler le résultat de la recherche SQL.
+            query: vi.fn().mockResolvedValue([
+                {
+                    id: '550e8400-e29b-41d4-a716-446655440000',
+                    daily_price: '320.00',
+                    security_deposit: '2800.00',
+                },
+            ]),
+
+            // Fournir le faux repository
+            // pendant la transaction.
+            getRepository: vi.fn(
+                () => transactionRepository,
+            ),
+        };
+
+        // ========================================
+        // 5. SIMULER UNE TRANSACTION
+        // ========================================
+
+        // Exécuter la fonction de la transaction
+        // sans ouvrir une véritable connexion SQL.
+        dataSource = {
+            transaction: vi.fn(
+                async (
+                    callback: (
+                        entityManager: typeof manager,
+                    ) => Promise<Reservation>,
+                ) => callback(manager),
+            ),
+            query: vi.fn(async (sql: string) => {
+                if (typeof sql === 'string' && sql.includes('users')) {
+                    return [{
+                        id: 'customer-test-id',
+                        email: 'verified.customer@luxuar.test',
+                        email_verified_at: new Date('2026-01-01T00:00:00.000Z'),
+                        status: 'active',
+                    }];
+                }
+                return [];
+            }),
+        };
+
+        // ========================================
+        // 6. CRÉER LE SERVICE À TESTER
+        // ========================================
+
+        service = new ReservationsService(
+            profilesRepository as unknown as
+            Repository<CustomerProfile>,
+
+            transactionRepository as unknown as
+            Repository<Reservation>,
+
+            dataSource as unknown as DataSource,
+            { quote: vi.fn().mockResolvedValue({
+              totalAmount: '960.00', rentalDays: 3, dailyPrice: '320.00',
+              extrasAmount:'0.00', deliveryAmount:'0.00',
+              discountAmount:'0.00', promotionCode:null, pickupMethod:'branch', extras:[],
+              pickupLocationId:null, dropoffLocationId:null,
+              pickupLocationName:null, dropoffLocationName:null,
+              locationFees:{pickup:'0.00',dropoff:'0.00',oneWay:'0.00'},
+            }) } as unknown as PremiumService,
+            {
+                check: (availabilityCheck = vi.fn().mockResolvedValue({
+                    available: true,
+                    details: {
+                        pickupLocationId: '11111111-1111-4111-8111-111111111111',
+                    },
+                })),
+            } as unknown as AvailabilityService,
+        );
+    });
+
+    describe('ReservationsService.issueMyCheckInCode', () => {
+        it('securely provisions a code for an existing confirmed reservation without a credential', async () => {
+            process.env.JWT_SECRET = 'reservation-test-secret-that-is-at-least-32-characters';
+            const expiresAt = new Date(Date.now() + 60 * 60_000);
+            const query = vi.fn()
+                .mockResolvedValueOnce([{
+                    id: 'reservation-id',
+                    status: 'confirmed',
+                    expiresAt,
+                    agencyName: 'Test Agency',
+                    agencyId: 'agency-id',
+                    credentialAgencyId: null,
+                    credentialReservationId: null,
+                    failedAttempts: 0,
+                    firstViewedAt: null,
+                    lastRotatedAt: null,
+                }])
+                .mockResolvedValueOnce([]);
+            const service = new ReservationsService(
+                {} as never,
+                {} as never,
+                {
+                    transaction: async (work: (manager: {query: typeof query}) => Promise<unknown>) =>
+                        work({query}),
+                } as never,
+                {} as never,
+                {} as never,
+            );
+
+            const result = await service.issueMyCheckInCode('customer-id', 'RES-2026-000001');
+
+            expect(result.code).toMatch(/^\d{8}$/);
+            expect(result.expiresAt).toEqual(expiresAt);
+            expect(result.agencyName).toBe('Test Agency');
+            expect(query.mock.calls[1][0]).toContain('INSERT INTO reservation_checkin_credentials');
+            expect(query.mock.calls[1][1][3]).toBe(checkInCodeHash(result.code));
+        });
+    });
+
+    // ==========================================
+    // TEST 1 : CRÉER UNE RÉSERVATION
+    // ==========================================
+
+    it(
+        'crée une réservation et calcule le prix',
+        async () => {
+            const result =
+                await service.createReservation(
+                    'customer-test-id',
+                    dto,
+                );
+
+            // Trois jours à 320 € = 960 €.
+            expect(result.rentalDays).toBe(3);
+
+            expect(result.dailyPrice).toBe(
+                '320.00',
+            );
+
+            expect(result.totalAmount).toBe(
+                '960.00',
+            );
+
+            // La caution est enregistrée
+            // séparément du prix de location.
+            expect(result.depositAmount).toBe(
+                '2800.00',
+            );
+
+            // La transaction cherche précisément le véhicule demandé.
+            expect(manager.query).toHaveBeenCalledWith(
+                expect.stringContaining('v.id = $1::uuid'),
+                [
+                    dto.vehicleId,
+                    '2035-11-25T00:00:00.000Z',
+                    '2035-11-28T00:00:00.000Z',
+                ],
+            );
+            expect(result.vehicleId).toBe(dto.vehicleId);
+
+            // Une réservation commence
+            // toujours avec le statut pending.
+            expect(result.status).toBe(
+                ReservationStatus.PENDING,
+            );
+
+            // Vérifier que la réservation
+            // a bien été enregistrée.
+            expect(
+                transactionRepository.save,
+            ).toHaveBeenCalledOnce();
+        },
+    );
+
+    // ==========================================
+    // TEST 1b : EMAIL NON VÉRIFIÉ REJETÉ
+    // ==========================================
+
+    it(
+        'refuse une réservation si le client n\'a pas vérifié son email',
+        async () => {
+            dataSource.query.mockResolvedValueOnce([
+                {
+                    id: 'unverified-customer-id',
+                    email: 'unverified@luxuar.test',
+                    email_verified_at: null,
+                    status: 'active',
+                },
+            ]);
+
+            await expect(
+                service.createReservation(
+                    'unverified-customer-id',
+                    dto,
+                ),
+            ).rejects.toThrow();
+
+            expect(dataSource.transaction).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // TEST 2 : PROFIL CLIENT ABSENT
+    // ==========================================
+
+    it(
+        'refuse une réservation sans profil client',
+        async () => {
+            // Simuler un client qui n'a pas
+            // encore complété son profil.
+            profilesRepository.findOne
+                .mockResolvedValue(null);
+
+            await expect(
+                service.createReservation(
+                    'customer-test-id',
+                    dto,
+                ),
+            ).rejects.toThrow(
+                BadRequestException,
+            );
+
+            // Aucune transaction ne doit commencer.
+            expect(
+                dataSource.transaction,
+            ).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // TEST 3 : DATES INCORRECTES
+    // ==========================================
+
+    it(
+        'refuse une date de retour avant le départ',
+        async () => {
+            // Placer le retour avant le départ.
+            dto.returnAt = '2035-11-20T00:00:00.000Z';
+
+            await expect(
+                service.createReservation(
+                    'customer-test-id',
+                    dto,
+                ),
+            ).rejects.toThrow(
+                BadRequestException,
+            );
+
+            // Aucune réservation ne doit être créée.
+            expect(
+                transactionRepository.save,
+            ).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // TEST 4 : PERMIS EXPIRÉ
+    // ==========================================
+
+    it(
+        'refuse un permis expirant avant le retour',
+        async () => {
+            // Simuler un permis qui expire
+            // pendant la période de location.
+            profilesRepository.findOne
+                .mockResolvedValue({
+                    userId: 'customer-test-id',
+                    licenseExpiresOn: '2035-11-26',
+                } as CustomerProfile);
+
+            await expect(
+                service.createReservation(
+                    'customer-test-id',
+                    dto,
+                ),
+            ).rejects.toThrow(
+                BadRequestException,
+            );
+
+            // La réservation ne doit pas être créée.
+            expect(
+                transactionRepository.save,
+            ).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // TEST 5 : AUCUNE VOITURE DISPONIBLE
+    // ==========================================
+
+    it(
+        'refuse une réservation sans voiture disponible',
+        async () => {
+            // Simuler une recherche SQL
+            // qui ne trouve aucune voiture.
+            manager.query.mockResolvedValue([]);
+
+            await expect(
+                service.createReservation(
+                    'customer-test-id',
+                    dto,
+                ),
+            ).rejects.toThrow(
+                ConflictException,
+            );
+
+            // Aucune réservation ne doit être enregistrée.
+            expect(
+                transactionRepository.save,
+            ).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // TEST 6 : AGENCE DÉRIVÉE DU VÉHICULE
+    // ==========================================
+
+    it(
+        'crée une réservation sans choix de lieu client',
+        async () => {
+            await expect(
+                service.createReservation('customer-test-id', dto),
+            ).resolves.toMatchObject({ vehicleId: dto.vehicleId });
+            expect(availabilityCheck).toHaveBeenCalledWith({
+                vehicleId: dto.vehicleId,
+                pickupLocationId: undefined,
+                dropoffLocationId: undefined,
+                pickupAt: dto.pickupAt,
+                returnAt: dto.returnAt,
+            });
+        },
+    );
+
+    it(
+        'refuse une réservation avec une agence de retour différente',
+        async () => {
+            dto.dropoffLocationId = '22222222-2222-4222-8222-222222222222';
+            availabilityCheck.mockRejectedValueOnce(
+                new BadRequestException('The rental agency is determined by the assigned vehicle'),
+            );
+
+            await expect(
+                service.createReservation('customer-test-id', dto),
+            ).rejects.toThrow('determined by the assigned vehicle');
+            expect(dataSource.transaction).not.toHaveBeenCalled();
+        },
+    );
+
+    it(
+        'refuse une réservation porte-à-porte',
+        async () => {
+            dto.pickupServiceMode = 'DOOR_TO_DOOR';
+
+            await expect(
+                service.createReservation('customer-test-id', dto),
+            ).rejects.toThrow('only available at an agency');
+            expect(dataSource.transaction).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // TEST 7 : INSTANTS PRECIS OBLIGATOIRES
+    // ==========================================
+
+    it(
+        'refuse une réservation réduite à une date (minuit UTC silencieux)',
+        async () => {
+            // Client historique : uniquement des dates civiles.
+            dto.pickupAt = undefined;
+            dto.returnAt = undefined;
+            dto.pickupDate = '2035-11-25';
+            dto.returnDate = '2035-11-28';
+
+            await expect(
+                service.createReservation(
+                    'customer-test-id',
+                    dto,
+                ),
+            ).rejects.toThrow(
+                BadRequestException,
+            );
+
+            expect(
+                dataSource.transaction,
+            ).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // TEST 8 : VALIDATION SERVEUR BLOQUANTE
+    // ==========================================
+
+    it(
+        'refuse une réservation quand la disponibilité est refusée',
+        async () => {
+            availabilityCheck.mockResolvedValue({
+                available: false,
+                message:
+                    'The selected period is no longer available for this vehicle',
+            });
+
+            await expect(
+                service.createReservation(
+                    'customer-test-id',
+                    dto,
+                ),
+            ).rejects.toThrow(
+                ConflictException,
+            );
+
+            expect(
+                dataSource.transaction,
+            ).not.toHaveBeenCalled();
+        },
+    );
+
+    // ==========================================
+    // F-10 : ANNULATION PAR LE CLIENT
+    // ==========================================
+
+    // Prépare une réservation appartenant au client connecté.
+    function storedReservationWith(
+        overrides: Partial<Reservation>,
+    ) {
+        const future = new Date('2035-11-25T00:00:00.000Z');
+        transactionRepository.findOne.mockResolvedValue({
+            id: 'reservation-1',
+            reservationNumber: 'RES-2026-000001',
+            customerId: 'customer-test-id',
+            vehicleId: '550e8400-e29b-41d4-a716-446655440000',
+            status: ReservationStatus.CONFIRMED,
+            pickupAt: future,
+            returnAt: new Date('2035-11-28T00:00:00.000Z'),
+            ...overrides,
+        } as Reservation);
+    }
+
+    it(
+        'annule une réservation confirmée avant la prise en charge',
+        async () => {
+            storedReservationWith({ status: ReservationStatus.CONFIRMED });
+            manager.query.mockResolvedValue([]); // aucune location liée
+
+            const result = await service.cancelMyReservation(
+                'customer-test-id',
+                'res-2026-000001',
+            );
+
+            expect(result.status).toBe(ReservationStatus.CANCELLED);
+            expect(manager.query).toHaveBeenCalled();
+        },
+    );
+
+    it(
+        'annule une réservation encore en attente',
+        async () => {
+            storedReservationWith({ status: ReservationStatus.PENDING });
+            manager.query.mockResolvedValue([]);
+
+            const result = await service.cancelMyReservation(
+                'customer-test-id',
+                'RES-2026-000001',
+            );
+
+            expect(result.status).toBe(ReservationStatus.CANCELLED);
+        },
+    );
+
+    it(
+        'refuse d annuler une réservation convertie en location',
+        async () => {
+            storedReservationWith({ status: ReservationStatus.CONVERTED });
+            manager.query.mockResolvedValue([]);
+
+            await expect(
+                service.cancelMyReservation(
+                    'customer-test-id',
+                    'RES-2026-000001',
+                ),
+            ).rejects.toThrow(ConflictException);
+        },
+    );
+
+    it(
+        'refuse d annuler une réservation avec un historique financier',
+        async () => {
+            storedReservationWith({ status: ReservationStatus.CONFIRMED });
+            // Une location existe : les montants doivent être réglés par le staff.
+            manager.query.mockResolvedValue([{ id: 'rental-1' }]);
+
+            await expect(
+                service.cancelMyReservation(
+                    'customer-test-id',
+                    'RES-2026-000001',
+                ),
+            ).rejects.toBeInstanceOf(ConflictException);
+        },
+    );
+
+    it(
+        'refuse d annuler après la date de prise en charge',
+        async () => {
+            storedReservationWith({
+                status: ReservationStatus.CONFIRMED,
+                pickupAt: new Date('2000-01-01T00:00:00.000Z'),
+            });
+            manager.query.mockResolvedValue([]);
+
+            await expect(
+                service.cancelMyReservation(
+                    'customer-test-id',
+                    'RES-2026-000001',
+                ),
+            ).rejects.toBeInstanceOf(ConflictException);
+        },
+    );
+});

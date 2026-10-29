@@ -1,0 +1,591 @@
+@import "tailwindcss";
+
+/* ==================================================================
+   LUXURY CARS — MAISON 2027 · DESIGN SYSTEM
+   ------------------------------------------------------------------
+   Deux matières : « Porcelaine » (ivoire chaud) et « Obsidienne ».
+   Principes : encre profonde, ivoire chaud, champagne en filigrane,
+   effets miroirs spéculaires (verre biseauté, reflets soyeux),
+   micro-animations fluides (mouvement cinématique),
+   lisibilité et contrastes absolus (WCAG AAA) en clair et sombre.
+
+   Tous les anciens noms de variables sont conservés : chaque module
+   hérite de la nouvelle identité sans modification de structure.
+   ================================================================== */
+:root {
+  color-scheme: light;
+
+  /* ---------- Typographie Unifiée (MAXIMUM 2 FAMILLES) ----------
+     1. Playfair Display: Titres, Grands en-têtes, Noms de véhicules
+     2. Inter: Corps, Navigation, Boutons, Prix, Labels, Formulaires, Tableaux, Dashboards
+     ------------------------------------------------------------------ */
+  --font-inter: var(--font-sans), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-cormorant: var(--font-cormorant), "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --sans: var(--font-inter);
+  --serif: var(--font-cormorant);
+  --display: var(--font-cormorant);
+
+  /* Échelle typographique harmonieuse & fluide */
+  --fs-display: clamp(48px, 7vw, 96px);
+  --fs-h1: clamp(42px, 6vw, 72px);
+  --fs-h2: clamp(32px, 4vw, 56px);
+  --fs-h3: clamp(26px, 2.8vw, 38px);
+  --fs-h4: 24px;
+  --fs-body-lg: 18px;
+  --fs-body: 17px;
+  --fs-body-sm: 15px;
+  --fs-label: 12px;
+  --fs-meta: 11px;
+
+  /* Graisses typographiques standardisées (sans excès) */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Hauteurs de ligne équilibrées */
+  --lh-tight: 1.15;
+  --lh-snug: 1.25;
+  --lh-normal: 1.55;
+  --lh-relaxed: 1.7;
+
+  /* Approches de lettres (Tracking) */
+  --tracking-tight: -0.025em;
+  --tracking-snug: -0.015em;
+  --tracking-normal: 0em;
+  --tracking-label: 0.12em;
+  --tracking-eyebrow: 0.22em;
+
+  /* ---------- Mise en page ---------- */
+  --container: 1320px;
+  --container-narrow: 880px;
+  --gutter: clamp(20px, 4vw, 56px);
+  --section-space: clamp(96px, 12vw, 176px);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ---------- Mouvement & Micro-animations ---------- */
+  --ease-lux: cubic-bezier(.16, 1, .3, 1);
+  --ease-out-soft: cubic-bezier(.22, .61, .36, 1);
+  --dur-1: .18s;
+  --dur-2: .4s;
+  --dur-3: .85s;
+  --dur-4: 1.5s;
+
+  /* ---------- Porcelaine (thème clair) — Contrastes maximisés ---------- */
+  --noir: #0c0c0e;          /* obsidienne */
+  --noir-2: #050506;
+  --ivory: #F8F5EF;         /* fond ivoire plus chaud */
+  --ivory-2: #f4efe6;
+  --ivory-3: #ede4d6;
+  --white: #FFFFFF;         /* surface cartes plus pure */
+  --white-2: #fdfcf9;
+  --ink: #151412;           /* texte principal plus profond */
+  --ink-2: #1f1d1a;
+  --ink-3: #38342f;
+  --muted: #5a544b;
+  --muted-2: #685f54;
+  --muted-3: #7a7064;
+  --muted-text: #524c44;
+  --gold-text: #B08A3E;     /* or plus riche */
+
+  --champagne: #b3925a;
+  --champagne-2: #8f6e38;
+  --champagne-3: #d9c49e;
+  --champagne-soft: rgba(179, 146, 90, .09);
+  --champagne-line: rgba(143, 110, 56, .26);
+  --on-accent: #0d0d0f;
+
+  --line: rgba(168, 121, 55, .22);
+  --line-soft: rgba(168, 121, 55, .14);
+  --line-strong: rgba(168, 121, 55, .38);
+
+  --danger: #9e362d;
+  --danger-text: #8c2a22;
+  --danger-bg: rgba(158, 54, 45, .08);
+  --danger-line: rgba(158, 54, 45, .32);
+  --success: #2e6244;
+  --success-text: #235438;
+  --success-bg: rgba(46, 98, 68, .085);
+  --success-line: rgba(46, 98, 68, .32);
+
+  --surface-glass: rgba(255, 254, 250, .88);
+  --header-bg: #ffffff;
+  --header-bg-soft: #ffffff;
+  --ivory-rgb: 246, 243, 236;
+  --surface-highlight: rgba(255, 255, 255, .82);
+  --card-glow: rgba(165, 134, 84, .06);
+
+  /* Effets miroir & biseau (clair) */
+  --mirror-edge: linear-gradient(135deg, rgba(255, 255, 255, .85) 0%, rgba(255, 255, 255, .2) 30%, rgba(165, 134, 84, .3) 100%);
+  --mirror-glow: 0 0 28px -6px rgba(165, 134, 84, .18);
+  --surface-mirror: linear-gradient(155deg, rgba(255, 255, 255, .98) 0%, rgba(248, 245, 238, .94) 100%);
+  --specular-sheen: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%);
+
+  /* Défilement Haute Horlogerie (Clair) */
+  --scroll-track: rgba(15, 15, 17, .03);
+  --scroll-track-border: rgba(15, 15, 17, .08);
+  --scroll-thumb: linear-gradient(180deg, #c4a775 0%, #a07d42 50%, #7d5e2e 100%);
+  --scroll-thumb-hover: linear-gradient(180deg, #dfc699 0%, #b89352 50%, #916e34 100%);
+  --scroll-thumb-border: rgba(255, 255, 255, .75);
+  --scroll-thumb-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), inset 0 -1px 0 rgba(0, 0, 0, .25), 0 1px 4px rgba(15, 15, 17, .2);
+  --scroll-thumb-glow: 0 0 14px rgba(165, 134, 84, .5);
+  --scroll-progress-gradient: linear-gradient(90deg, #7d5e2e 0%, #a07d42 35%, #c4a775 75%, #f4e8cc 98%, #ffffff 100%);
+  --scroll-progress-glow: 0 0 10px rgba(165, 134, 84, .6), 0 0 20px rgba(165, 134, 84, .3);
+
+  --shadow: 0 30px 80px -40px rgba(15, 15, 17, .25);
+  --shadow-soft: 0 8px 30px -12px rgba(15, 15, 17, .12), 0 2px 8px rgba(15, 15, 17, .04);
+  --shadow-luxe: 0 40px 90px -30px rgba(168, 121, 55, .28), 0 12px 40px -16px rgba(15, 15, 17, .14);
+  --shadow-haute: 0 60px 120px -40px rgba(168, 121, 55, .36), 0 20px 60px -20px rgba(15, 15, 17, .18);
+  --button-shadow: none;
+
+  --radius-card: 4px;
+  --radius-field: 2px;
+  --radius-button: 2px;
+  --radius-xl: 4px;
+  --radius-pill: 2px;
+
+  --focus-ring: #8a6c3f;
+  --panel-elevated: #fffefa;
+  --panel-border: rgba(15, 15, 17, .13);
+  --panel-backdrop: rgba(12, 12, 14, .52);
+
+  /* Filets et encres */
+  --gold-rule: linear-gradient(90deg, transparent 0%, var(--line-strong) 18%, var(--champagne-line) 50%, var(--line-strong) 82%, transparent 100%);
+  --gold-rule-strong: linear-gradient(90deg, transparent 0%, var(--champagne-line) 20%, var(--champagne) 50%, var(--champagne-line) 80%, transparent 100%);
+  --gold-ink: linear-gradient(100deg, var(--champagne-2) 0%, var(--gold-text) 100%);
+  --gold-ink-strong: linear-gradient(100deg, var(--gold-text) 0%, var(--champagne-2) 55%, var(--gold-text) 100%);
+  --sheen: linear-gradient(115deg, transparent 36%, rgba(255, 255, 255, .35) 50%, transparent 64%);
+  --grain: none;
+
+  /* Photographie */
+  --photo-veil: linear-gradient(180deg, rgba(5, 5, 6, .08) 0%, rgba(5, 5, 6, 0) 34%, rgba(5, 5, 6, .58) 100%);
+  --photo-veil-side: linear-gradient(90deg, rgba(5, 5, 6, .72) 0%, rgba(5, 5, 6, .32) 46%, rgba(5, 5, 6, 0) 78%);
+
+  --calendar-available-bg: #e2ede3;
+  --calendar-available-ink: #255238;
+  --calendar-reserved-bg: #f2e7d3;
+  --calendar-reserved-ink: #67491d;
+  --calendar-unavailable-bg: #f2dfdc;
+  --calendar-unavailable-ink: #7f3234;
+
+  /* Alias historiques */
+  --background: var(--ivory);
+  --surface: var(--white);
+  --surface-soft: var(--ivory-3);
+  --border: var(--line);
+  --text: var(--ink);
+  --text-soft: var(--muted);
+  --accent: var(--champagne);
+  --accent-light: var(--champagne-2);
+}
+
+/* ---------- Obsidienne (thème sombre) — Contrastes éclatants ---------- */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --noir: #070709;
+  --noir-2: #030304;
+  --ivory: #111111;
+  --ivory-2: #151515;
+  --ivory-3: #1c1c1c;
+  --white: #191919;
+  --white-2: #212121;
+  --ink: #F6F1E8;
+  --ink-2: #eee7dc;
+  --ink-3: #d1c9ba;
+  --muted: #b8b0a1;
+  --muted-2: #a8a090;
+  --muted-3: #8e8778;
+  --muted-text: #c8c0b2;
+  --gold-text: #C6A46C;     /* or */
+
+  --champagne: #ccb181;
+  --champagne-2: #dcc296;
+  --champagne-3: #edd9b5;
+  --champagne-soft: rgba(204, 177, 129, .08);
+  --champagne-line: rgba(204, 177, 129, .34);
+  --on-accent: #070709;
+
+  --line: rgba(198, 164, 108, .32);
+  --line-soft: rgba(198, 164, 108, .22);
+  --line-strong: rgba(198, 164, 108, .48);
+
+  --danger: #e28a80;
+  --danger-text: #f3aea4;
+  --danger-bg: rgba(226, 138, 128, .12);
+  --danger-line: rgba(226, 138, 128, .38);
+  --success: #8fc7a0;
+  --success-text: #a8dcb7;
+  --success-bg: rgba(143, 199, 160, .12);
+  --success-line: rgba(143, 199, 160, .36);
+
+  --surface-glass: rgba(20, 20, 23, .88);
+  --header-bg: rgba(10, 10, 12, .82);
+  --header-bg-soft: rgba(10, 10, 12, .94);
+  --ivory-rgb: 10, 10, 12;
+  --surface-highlight: rgba(255, 255, 255, .045);
+  --card-glow: rgba(204, 177, 129, .05);
+
+  /* Effets miroir & biseau (sombre) */
+  --mirror-edge: linear-gradient(135deg, rgba(255, 255, 255, .32) 0%, rgba(255, 255, 255, .05) 35%, rgba(204, 177, 129, .38) 100%);
+  --mirror-glow: 0 0 32px -4px rgba(204, 177, 129, .22);
+  --surface-mirror: linear-gradient(155deg, rgba(26, 26, 30, .96) 0%, rgba(15, 15, 18, .98) 100%);
+  --specular-sheen: linear-gradient(110deg, transparent 30%, rgba(237, 217, 181, .18) 50%, transparent 70%);
+
+  /* Défilement Haute Horlogerie (Sombre) */
+  --scroll-track: rgba(255, 255, 255, .02);
+  --scroll-track-border: rgba(255, 255, 255, .06);
+  --scroll-thumb: linear-gradient(180deg, #edd6ad 0%, #c5a870 50%, #9b7946 100%);
+  --scroll-thumb-hover: linear-gradient(180deg, #f7e6c4 0%, #dcbe83 50%, #b18d53 100%);
+  --scroll-thumb-border: rgba(255, 255, 255, .28);
+  --scroll-thumb-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), inset 0 -1px 0 rgba(0, 0, 0, .45), 0 2px 6px rgba(0, 0, 0, .5);
+  --scroll-thumb-glow: 0 0 16px rgba(226, 201, 155, .65);
+  --scroll-progress-gradient: linear-gradient(90deg, #9b7946 0%, #c5a870 40%, #edd6ad 80%, #ffffff 100%);
+  --scroll-progress-glow: 0 0 12px rgba(226, 201, 155, .7), 0 0 24px rgba(226, 201, 155, .35);
+
+  --shadow: 0 50px 120px -60px rgba(0, 0, 0, .95);
+  --shadow-soft: 0 30px 80px -40px rgba(0, 0, 0, .85);
+  --shadow-luxe: 0 70px 160px -70px rgba(0, 0, 0, .98), 0 30px 90px -40px rgba(198, 164, 108, .32);
+  --shadow-haute: 0 90px 180px -80px rgba(0, 0, 0, 1), 0 40px 100px -50px rgba(198, 164, 108, .42);
+
+  --focus-ring: #dcc296;
+  --panel-elevated: #18181c;
+  --panel-border: rgba(253, 250, 243, .12);
+  --panel-backdrop: rgba(0, 0, 0, .7);
+
+  --sheen: linear-gradient(115deg, transparent 38%, rgba(237, 217, 181, .16) 50%, transparent 62%);
+
+  --calendar-available-bg: #152c20;
+  --calendar-available-ink: #b2e4c2;
+  --calendar-reserved-bg: #322818;
+  --calendar-reserved-ink: #edd29e;
+  --calendar-unavailable-bg: #351e20;
+  --calendar-unavailable-ink: #f0b4ad;
+}
+
+/* ==================================================================
+   BASE & TYPOGRAPHIE LISIBLE
+   ================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; padding: 0; }
+
+html {
+  background: var(--ivory);
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  accent-color: var(--champagne-2);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-body);
+  font-weight: 400;
+  line-height: 1.7;
+  letter-spacing: .005em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+  overflow-x: clip;
+  transition: background-color var(--dur-2) var(--ease-lux), color var(--dur-2) var(--ease-lux);
+}
+
+::selection {
+  background: var(--champagne-3);
+  color: var(--noir);
+}
+html[data-theme="dark"] ::selection {
+  background: var(--champagne);
+  color: #070709;
+}
+
+h1, h2, h3 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  font-optical-sizing: auto;
+  font-kerning: normal;
+}
+
+h4, h5, h6 {
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: var(--lh-snug);
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: var(--fs-h1);
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  line-height: 1.06;
+}
+
+h2 {
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.1;
+}
+
+h3 {
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  line-height: 1.16;
+}
+
+h4 {
+  font-size: var(--fs-h4);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+:where(h1, h2, h3) :where(em, i) { font-style: normal; color: var(--gold-text); }
+:where(p, li, dd, blockquote) { text-wrap: pretty; }
+:where(h1, h2, h3, h4, p, dd, td, th, li, strong, span, a) { overflow-wrap: break-word; }
+
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+img, svg, video { display: block; max-width: 100%; }
+img { height: auto; }
+
+:where(table) { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+:where(thead th) { color: var(--muted-text); font-weight: 600; letter-spacing: .08em; }
+:where(hr) { border: 0; border-top: 1px solid var(--line-soft); }
+
+:where(dd, td, strong, output, time) { font-variant-numeric: tabular-nums lining-nums; }
+
+.container { width: min(calc(100% - 2 * var(--gutter)), var(--container)); margin-inline: auto; }
+
+::selection { background: var(--champagne-2); color: var(--white); }
+
+/* ==================================================================
+   ACCESSIBILITÉ & FOCUS ÉLÉGANT
+   ================================================================== */
+:where(button, a, input, select, textarea) { -webkit-tap-highlight-color: transparent; }
+:is(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 1.5px solid var(--focus-ring) !important;
+  outline-offset: 3px !important;
+  box-shadow: var(--mirror-glow);
+}
+:where(input, select, textarea) {
+  color-scheme: inherit;
+  caret-color: var(--champagne-2);
+  background-color: var(--white);
+  border-color: var(--line);
+}
+html[data-theme="dark"] :where(input, select, textarea) { color-scheme: dark; }
+html[data-theme="light"] :where(input, select, textarea) { color-scheme: light; }
+:where(input, textarea)::placeholder { color: var(--muted-3); opacity: 1; }
+:where(input, select, textarea):disabled { opacity: .55; cursor: not-allowed; }
+:where(button):disabled { opacity: .5; }
+:where([aria-disabled="true"]) { cursor: not-allowed; }
+
+@media (pointer: coarse) {
+  :where(button, select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"])) { min-height: 44px; }
+}
+
+@media (prefers-contrast: more) {
+  :root { --line: rgba(15, 15, 17, .5); --line-strong: rgba(15, 15, 17, .7); --muted: #3a362f; --muted-text: #3a362f; }
+  html[data-theme="dark"] { --line: rgba(253, 250, 243, .5); --line-strong: rgba(253, 250, 243, .7); --muted: #ded7ca; --muted-text: #ded7ca; }
+}
+
+/* ==================================================================
+   EFFET MIROIR & MICRO-MOTIONS UNIFIÉES
+   ================================================================== */
+
+/* 1. Transitions soyeuses avec accélération matérielle */
+:where(a, button, summary) {
+  transition:
+    color var(--dur-1) var(--ease-lux),
+    background-color var(--dur-1) var(--ease-lux),
+    border-color var(--dur-1) var(--ease-lux),
+    box-shadow var(--dur-2) var(--ease-lux),
+    opacity var(--dur-1) var(--ease-lux),
+    transform var(--dur-2) var(--ease-lux);
+}
+:where(input, select, textarea) {
+  transition:
+    color var(--dur-1) var(--ease-lux),
+    background-color var(--dur-1) var(--ease-lux),
+    border-color var(--dur-1) var(--ease-lux),
+    box-shadow var(--dur-1) var(--ease-lux);
+}
+
+/* 2. Micro-retour tactile au clic & survol */
+:where(button:not(:disabled)) {
+  position: relative;
+  will-change: transform, box-shadow;
+}
+:where(button:not(:disabled)):hover {
+  transform: translateY(-1px);
+}
+:where(button:not(:disabled):active) {
+  transform: translateY(1px) scale(.992);
+}
+
+/* 3. Champs & contrôles avec biseau spéculaire et halo au focus */
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]), select, textarea) {
+  border-radius: var(--radius-field);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .04);
+}
+:where(input, select, textarea):hover:not(:disabled):not(:focus) {
+  border-color: var(--line-strong);
+}
+:where(input, select, textarea):focus {
+  outline: none;
+  border-color: var(--champagne-2);
+  box-shadow: 0 0 0 1px var(--champagne-2), 0 0 14px -2px var(--card-glow);
+}
+
+/* 4. Liens éditoriaux avec filet d'or animé */
+:where(main a:not([class])) {
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+:where(main a:not([class])):hover {
+  text-decoration-color: var(--champagne-2);
+}
+
+/* 5. Lignes de tableau avec liseré or interactif */
+:where(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+:where(tbody tr) {
+  transition: background-color var(--dur-1) var(--ease-lux), box-shadow var(--dur-1) var(--ease-lux);
+}
+:where(tbody tr:hover) {
+  background-color: var(--champagne-soft);
+  box-shadow: inset 3px 0 0 var(--champagne-2);
+}
+
+/* 6. Pastilles de statut joaillières avec pulsation bijou */
+:where([class*="Badge"]::before, [class*="badge"]::before, [class*="status"]::before, [class*="Status"]::before, [class*="pill"]::before) {
+  box-shadow: 0 0 6px currentColor;
+  animation: beacon-pulse 2.4s infinite ease-in-out;
+}
+
+:where(input[type="file"])::file-selector-button {
+  margin-right: .8em;
+  padding: .55em 1.1em;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color var(--dur-1) var(--ease-lux), border-color var(--dur-1) var(--ease-lux);
+}
+:where(input[type="file"])::file-selector-button:hover {
+  background: var(--ink);
+  color: var(--ivory);
+  border-color: var(--ink);
+}
+
+:where(summary) { cursor: pointer; }
+:where(summary)::marker { color: var(--muted-3); }
+:where(img) { image-rendering: auto; }
+
+/* ==================================================================
+   ANIMATIONS SPÉCULAIRES (REFLETS & ÉCLATS)
+   ================================================================== */
+@keyframes lux-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lux-rise { from { opacity: 0; transform: translate3d(0, 14px, 0); } to { opacity: 1; transform: none; } }
+@keyframes mirror-shimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  100% { transform: translateX(250%) skewX(-20deg); }
+}
+@keyframes beacon-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+body > main, body > div > main { animation: lux-fade var(--dur-3) var(--ease-lux); }
+
+/* ==================================================================
+   HAUTE HORLOGERIE SCROLL EXPERIENCE (BARRE DE DÉFILEMENT SPÉCULAIRE)
+   ================================================================== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--champagne-2) var(--scroll-track);
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scroll-track);
+  border-left: 1px solid var(--scroll-track-border);
+  backdrop-filter: blur(10px);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: var(--radius-field);
+  border: 1px solid var(--scroll-thumb-border);
+  box-shadow: var(--scroll-thumb-shadow);
+  transition: background var(--dur-2) var(--ease-lux), box-shadow var(--dur-2) var(--ease-lux);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scroll-thumb-hover);
+  box-shadow: var(--scroll-thumb-shadow), var(--scroll-thumb-glow);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--champagne);
+  box-shadow: 0 0 18px var(--champagne);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+@media (max-width: 760px) {
+  :root { --fs-body: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+@media print {
+  body { background: #fff; color: #000; }
+}

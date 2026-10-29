@@ -1,0 +1,33 @@
+import {
+    IsIn,
+    IsNumber,
+    IsOptional,
+    IsString,
+    Matches,
+    Max,
+    MaxLength,
+    Min,
+} from 'class-validator';
+
+export class ReservationPaymentDto {
+    @IsIn(['rental_payment', 'refund'])
+    type!: 'rental_payment' | 'refund';
+
+    @IsIn(['cash', 'card', 'bank_transfer'])
+    method!: 'cash' | 'card' | 'bank_transfer';
+
+    @IsNumber({ maxDecimalPlaces: 2 })
+    @Min(0.01)
+    @Max(1000000)
+    amount!: number;
+
+    @IsString()
+    @Matches(/\S/)
+    @MaxLength(100)
+    reference!: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(500)
+    notes?: string;
+}

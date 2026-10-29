@@ -1,0 +1,878 @@
+/* ==============================================================
+   LUXUAR — MAISON FLEET VEHICLE CARD
+   Aesthetics: Rolls-Royce / Patek Philippe High Horology
+   Typography: Inter (specs, prices, labels, buttons) +
+               Playfair Display (car model name only)
+   Icons: Lucide React (20px champagne-gold, stroke 1.5)
+   Geometry: Precision rectangular cards (2-4px radius max)
+   ============================================================== */
+
+:root {
+  --champagne-icon: #9e7d47;
+  --spec-divider: rgba(143, 110, 56, 0.16);
+}
+
+:global(html[data-theme="dark"]) {
+  --champagne-icon: #d8bc88;
+  --spec-divider: rgba(204, 177, 129, 0.16);
+}
+
+/* ==============================================================
+   GRILLE DU CATALOGUE
+   ============================================================== */
+
+.vehicleGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 28px;
+  width: 100%;
+}
+
+/* ==============================================================
+   CARTE VÉHICULE
+   ============================================================== */
+
+.vehicleCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  border: 1px solid var(--panel-border);
+  background: var(--surface-mirror);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 var(--surface-highlight), var(--shadow-soft);
+  overflow: hidden;
+  transition:
+    transform var(--dur-2) var(--ease-lux),
+    border-color var(--dur-2) var(--ease-lux),
+    box-shadow var(--dur-2) var(--ease-lux);
+}
+
+.vehicleCard:hover {
+  transform: translateY(-4px);
+  border-color: var(--champagne);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    var(--mirror-glow),
+    var(--shadow-luxe);
+}
+
+/* Liseré d'or supérieur révélé au survol */
+.vehicleCard::before {
+  content: '';
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  pointer-events: none;
+  background: var(--gold-rule);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.vehicleCard:hover::before,
+.vehicleCard:focus-within::before {
+  transform: scaleX(1);
+}
+
+/* Éclat miroir spéculaire au survol */
+.vehicleCard::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  pointer-events: none;
+  background: var(--specular-sheen);
+  transform: translateX(-180%) skewX(-20deg);
+  opacity: 0;
+  transition: opacity var(--dur-1) ease;
+}
+
+.vehicleCard:hover::after {
+  opacity: 1;
+  animation: mirror-shimmer 1.1s var(--ease-lux);
+}
+
+/* ==============================================================
+   VISUEL CINÉMATIQUE / SHOWROOM
+   ============================================================== */
+
+.visualLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  outline: none;
+}
+
+.visualLink:focus-visible .vehicleVisual {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.vehicleVisual {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 260px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--champagne);
+  background:
+    radial-gradient(130% 110% at 50% 5%,
+      rgba(255, 255, 255, 0.6) 0%,
+      rgba(255, 255, 255, 0) 65%),
+    var(--ivory-2);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+
+:global(html[data-theme="dark"]) .vehicleVisual {
+  background:
+    radial-gradient(130% 110% at 50% 5%,
+      rgba(204, 177, 129, 0.09) 0%,
+      rgba(0, 0, 0, 0) 65%),
+    var(--ivory-3);
+}
+
+.visualTop {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.categoryBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border: 1px solid rgba(163, 126, 62, 0.45);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 243, 233, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #63430f;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 8px -2px rgba(99, 67, 15, 0.16);
+  transition:
+    border-color var(--dur-1) var(--ease-lux),
+    transform var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux),
+    box-shadow var(--dur-1) var(--ease-lux);
+}
+
+.categoryBadge:hover {
+  border-color: rgba(163, 126, 62, 0.75);
+  color: #4a3108;
+  transform: translateY(-1px);
+}
+
+.yearBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  border: 1px solid rgba(163, 126, 62, 0.45);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 243, 233, 0.95) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #63430f;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: normal;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  border-radius: 2px;
+  box-shadow: inset 0 1px 0 #ffffff, 0 2px 8px -2px rgba(99, 67, 15, 0.16);
+  transition:
+    border-color var(--dur-1) var(--ease-lux),
+    transform var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux);
+}
+
+:global(html[data-theme="dark"]) .categoryBadge,
+:global(html[data-theme="dark"]) .yearBadge {
+  background: rgba(18, 18, 22, 0.9);
+  border-color: rgba(218, 182, 122, 0.38);
+  color: #f3d79b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+:global(html[data-theme="dark"]) .categoryBadge:hover,
+:global(html[data-theme="dark"]) .yearBadge:hover {
+  border-color: rgba(218, 182, 122, 0.75);
+  color: #fff2d1;
+}
+
+.vehicleImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 24px 24px 34px;
+  box-sizing: border-box;
+  object-fit: contain;
+  filter: drop-shadow(0 22px 24px rgba(0, 0, 0, 0.28));
+  transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vehicleVisual:hover .vehicleImage {
+  transform: scale(1.05);
+}
+
+.vehicleImageEmpty {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 45%, var(--ivory-2), transparent 68%),
+    var(--ivory-3);
+}
+
+.visualScrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(10, 10, 12, 0.38) 0%, rgba(10, 10, 12, 0) 30%),
+    linear-gradient(0deg, rgba(10, 10, 12, 0.32) 0%, rgba(10, 10, 12, 0) 26%);
+}
+
+.visualShine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  background: radial-gradient(
+    560px circle at 50% 50%,
+    rgba(239, 216, 164, 0.16),
+    transparent 62%
+  );
+}
+
+.vehicleVisual:hover .visualShine {
+  opacity: 1;
+}
+
+.availableLabel {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--success);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+
+.availableLabel::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success), 0 0 12px var(--success);
+  animation: beacon-pulse 2.2s infinite ease-in-out;
+}
+
+.editionFlag {
+  position: relative;
+  z-index: 2;
+  margin-top: 10px;
+}
+
+.flagSpecial,
+.flagLimited {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border: 1px solid transparent;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+  border-radius: 2px;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+
+.flagSpecial {
+  border-color: rgba(201, 118, 47, 0.6);
+  background: rgba(16, 13, 10, 0.62);
+  color: #f0b57e;
+}
+
+.flagLimited {
+  border-color: rgba(180, 84, 60, 0.6);
+  background: rgba(16, 13, 10, 0.62);
+  color: #f3aea4;
+}
+
+/* ==============================================================
+   CORPS DE CARTE & TYPOGRAPHIE
+   ============================================================== */
+
+.vehicleBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 26px 28px 28px;
+}
+
+.vehicleBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--champagne-2);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+:global(html[data-theme="dark"]) .vehicleBrand {
+  color: var(--champagne);
+}
+
+.vehicleBrand::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  flex-shrink: 0;
+  background: var(--champagne-line);
+}
+
+/* NOM DU MODÈLE : Playfair Display SemiBold pour les véhicules de prestige */
+.vehicleTitle {
+  margin: 10px 0 0;
+  min-height: 56px;
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--dur-1) var(--ease-lux);
+}
+
+.titleLink:hover {
+  color: var(--champagne-2);
+}
+
+.titleLink:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* DESCRIPTION : Police standard Inter lisible, contrastée, fluide */
+.description {
+  margin: 8px 0 0;
+  min-height: 42px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.55;
+  letter-spacing: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ==============================================================
+   GRILLE DES SPÉCIFICATIONS — 9 ICÔNES LUCIDE
+   Grille 3x3 avec filets de séparation subtils et or champagne.
+   ============================================================== */
+
+.specGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  margin: 20px 0;
+  border-top: 1px solid var(--spec-divider);
+  border-bottom: 1px solid var(--spec-divider);
+}
+
+.specCell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 13px 6px;
+  min-width: 0;
+  position: relative;
+  transition: background-color var(--dur-1) var(--ease-lux);
+}
+
+.specCell:hover {
+  background-color: var(--champagne-soft);
+}
+
+/* Séparateurs verticaux subtils entre colonnes */
+.specCell:not(:nth-child(3n)) {
+  border-right: 1px solid var(--spec-divider);
+}
+
+/* Séparateurs horizontaux subtils entre rangées */
+.specCell:nth-child(-n + 6) {
+  border-bottom: 1px solid var(--spec-divider);
+}
+
+.specIconWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 6px;
+  color: var(--champagne-icon);
+  flex-shrink: 0;
+}
+
+.specIcon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  transition:
+    transform var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux);
+}
+
+.specCell:hover .specIcon {
+  transform: scale(1.08);
+  color: var(--champagne-2);
+}
+
+:global(html[data-theme="dark"]) .specCell:hover .specIcon {
+  color: var(--champagne-3);
+}
+
+.specLabel {
+  display: block;
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.specValue {
+  display: block;
+  width: 100%;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: normal;
+  color: var(--ink);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* ==============================================================
+   TARIFS & DÉTAILS FINANCIERS
+   Typographie standard Inter (prix, labels, monnaie), icône Euro 20px
+   ============================================================== */
+
+.pricing {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.dailyRate {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 6px;
+}
+
+.rateHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rateIcon {
+  width: 20px;
+  height: 20px;
+  color: var(--champagne-icon);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  flex-shrink: 0;
+}
+
+.rateLabel {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.rateValueWrap {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.ratePrice {
+  font-family: var(--sans);
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+:global(html[data-theme="dark"]) .ratePrice {
+  color: var(--ink);
+}
+
+.ratePeriod {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pricingSecondary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 6px;
+  text-align: right;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.deposit,
+.vehicleValue {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  white-space: nowrap;
+  text-align: right;
+  min-width: 0;
+}
+
+.secondaryLabel {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-2);
+  white-space: nowrap;
+}
+
+.secondaryValue {
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: normal;
+  color: var(--ink-2);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.vehicleValue .secondaryValue {
+  color: var(--champagne-2);
+}
+
+:global(html[data-theme="dark"]) .vehicleValue .secondaryValue {
+  color: var(--gold-text);
+}
+
+/* ==============================================================
+   ACTIONS PREMIUM : COMPARER & SAUVEGARDER
+   Icônes Lucide (ChartNoAxesColumn & Heart), rectangulaires (2px)
+   ============================================================== */
+
+.premiumActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.actionButton {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--panel-border);
+  background: var(--white-2);
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  border-radius: 2px;
+  transition:
+    background-color var(--dur-1) var(--ease-lux),
+    border-color var(--dur-1) var(--ease-lux),
+    color var(--dur-1) var(--ease-lux),
+    box-shadow var(--dur-1) var(--ease-lux);
+}
+
+.actionButton:hover {
+  border-color: var(--champagne);
+  color: var(--ink);
+  background: var(--champagne-soft);
+}
+
+.actionIcon {
+  color: var(--champagne-icon);
+  flex-shrink: 0;
+  transition: transform var(--dur-1) var(--ease-lux);
+}
+
+.actionButton:hover .actionIcon {
+  transform: scale(1.1);
+  color: var(--champagne-2);
+}
+
+.actionButton[aria-pressed="true"],
+.actionActive {
+  background: var(--champagne-soft);
+  border-color: var(--champagne);
+  color: var(--ink);
+}
+
+.favoriteActive,
+.actionButton.favoriteActive {
+  background: var(--champagne-soft);
+  border-color: var(--champagne);
+  color: var(--ink);
+}
+
+.favoriteActive .actionIcon {
+  color: var(--champagne-2);
+}
+
+:global(html[data-theme="dark"]) .actionButton {
+  background: rgba(22, 22, 26, 0.9);
+  border-color: var(--panel-border);
+  color: var(--ink-2);
+}
+
+:global(html[data-theme="dark"]) .actionButton:hover {
+  background: rgba(204, 177, 129, 0.12);
+  border-color: var(--champagne);
+  color: var(--ink);
+}
+
+:global(html[data-theme="dark"]) .actionButton[aria-pressed="true"],
+:global(html[data-theme="dark"]) .actionActive,
+:global(html[data-theme="dark"]) .favoriteActive {
+  background: rgba(204, 177, 129, 0.18);
+  border-color: var(--champagne);
+  color: var(--ink);
+}
+
+:global(html[data-theme="dark"]) .actionIcon {
+  color: var(--champagne);
+}
+
+.actionButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ==============================================================
+   BOUTON PRINCIPAL D'ACTION (CTA)
+   Format rectangulaire (2px), Inter, finitions joaillières
+   ============================================================== */
+
+.reserveButton {
+  flex-shrink: 0;
+  margin-top: 18px;
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--noir);
+  background: var(--noir);
+  color: #faf5eb;
+  font-family: var(--sans);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 2px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px -3px rgba(12, 12, 14, 0.25);
+  position: relative;
+  overflow: hidden;
+  transition:
+    background var(--dur-2) var(--ease-lux),
+    border-color var(--dur-2) var(--ease-lux),
+    color var(--dur-2) var(--ease-lux),
+    transform var(--dur-1) var(--ease-lux),
+    box-shadow var(--dur-2) var(--ease-lux);
+}
+
+.reserveButton:hover {
+  background: var(--champagne);
+  border-color: var(--champagne);
+  color: var(--noir);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -6px rgba(179, 146, 90, 0.45);
+}
+
+.reserveButton:active {
+  transform: translateY(1px);
+}
+
+.reserveButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+:global(html[data-theme="dark"]) .reserveButton {
+  background: var(--champagne);
+  border-color: var(--champagne);
+  color: #070709;
+  box-shadow: 0 4px 14px -3px rgba(204, 177, 129, 0.25);
+}
+
+:global(html[data-theme="dark"]) .reserveButton:hover {
+  background: #f7e6c4;
+  border-color: #f7e6c4;
+  color: #000000;
+  box-shadow: 0 8px 24px -6px rgba(247, 230, 196, 0.45);
+}
+
+/* ==============================================================
+   RESPONSIVE DESIGN (Desktop, Tablette, Mobile)
+   ============================================================== */
+
+@media (max-width: 1200px) {
+  .vehicleGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .vehicleGrid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .vehicleBody {
+    padding: 22px 20px 24px;
+  }
+
+  .vehicleVisual {
+    min-height: 230px;
+    padding: 16px;
+  }
+
+  .specCell {
+    padding: 10px 4px;
+  }
+
+  .specIconWrap {
+    width: 20px;
+    height: 20px;
+    margin-bottom: 4px;
+  }
+
+  .specLabel {
+    font-size: 9.5px;
+    letter-spacing: 0.08em;
+  }
+
+  .specValue {
+    font-size: 12.5px;
+  }
+
+  .pricing {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .pricingSecondary {
+    align-items: flex-start;
+    text-align: left;
+    width: 100%;
+    flex-direction: row;
+    justify-content: space-between;
+  }
+
+  .deposit,
+  .vehicleValue {
+    justify-content: flex-start;
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vehicleCard,
+  .vehicleCard::before,
+  .vehicleCard::after,
+  .vehicleImage,
+  .reserveButton,
+  .actionButton,
+  .actionIcon {
+    animation: none !important;
+    transition: none !important;
+  }
+}

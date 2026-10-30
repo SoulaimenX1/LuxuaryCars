@@ -11,6 +11,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import { createHmac, randomBytes, randomUUID } from 'node:crypto';
+// @ts-ignore
 import Stripe from 'stripe';
 import { Reservation, ReservationStatus } from '../reservations/entities/reservation.entity.js';
 import { InboxService } from '../notifications/inbox.service.js';

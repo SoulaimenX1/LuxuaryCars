@@ -20,7 +20,6 @@ import { DataSource } from 'typeorm';
 import {
     formatMfaUserAgent,
     generateMfaRefreshToken,
-    generateOpaqueToken,
     hashAuthToken,
     normalizeInetAddress,
     type AuthRequestMetadata,

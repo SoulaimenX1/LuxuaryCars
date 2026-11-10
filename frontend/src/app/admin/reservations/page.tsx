@@ -317,9 +317,11 @@ export default function AdminReservationsPage() {
   const visible = useMemo(() => {
     return reservations.filter((r) => {
       if (r.status === 'no_show') return false;
-      const cName = customerName(r.customerId);
-      const cEmail = customerEmail(r.customerId);
-      const vName = vehicleName(r.vehicleId);
+      const c = customerMap.get(r.customerId);
+      const cName = c ? `${c.firstName} ${c.lastName}` : r.customerId.slice(0, 8);
+      const cEmail = c?.email || '';
+      const v = vehicleMap.get(r.vehicleId);
+      const vName = v ? `${v.brandName} ${v.modelName}` : r.vehicleId.slice(0, 8);
       const searchTarget = `${r.reservationNumber} ${cName} ${cEmail} ${vName}`.toLowerCase();
       const query = search.toLowerCase().trim();
 

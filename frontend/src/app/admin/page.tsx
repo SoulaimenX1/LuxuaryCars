@@ -6,13 +6,11 @@ import {
     AlertCircle,
     ArrowRight,
     ArrowUpRight,
-    BarChart3,
     CalendarCheck,
     Car,
     CheckCircle2,
     Clock,
     CreditCard,
-    ShieldCheck,
     TrendingUp,
     Users,
 } from 'lucide-react';
@@ -153,16 +151,6 @@ function formatCurrency(amountEur: number | null | undefined): string {
         currency: 'EUR',
         maximumFractionDigits: 0,
     }).format(amountEur);
-}
-
-function formatCount(val: unknown): string {
-    if (typeof val === 'number' && Number.isFinite(val)) {
-        return new Intl.NumberFormat('en-US').format(val);
-    }
-    if (typeof val === 'string' && val.trim() !== '' && Number.isFinite(Number(val))) {
-        return new Intl.NumberFormat('en-US').format(Number(val));
-    }
-    return '—';
 }
 
 function formatPercent(val: number | null | undefined): string {

@@ -10,17 +10,15 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import * as crypto from 'crypto';
 import { DataSource } from 'typeorm';
-import { User, UserRole } from '../../users/entities/user.entity.js';
+import { User } from '../../users/entities/user.entity.js';
 import { UsersService } from '../../users/users.service.js';
 import {
     formatMfaUserAgent,
     generateMfaRefreshToken,
-    generateOpaqueToken,
     hashAuthToken,
     normalizeInetAddress,
     type AuthRequestMetadata,
 } from '../auth.service.js';
-import type { AuthenticatedUser } from '../guards/jwt-auth.guard.js';
 
 interface RateLimitEntry {
     count: number;

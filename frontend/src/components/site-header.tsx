@@ -6,7 +6,6 @@ import {
     useRouter,
 } from 'next/navigation';
 import {
-    useEffect,
     useState,
 } from 'react';
 
@@ -39,23 +38,8 @@ export default function SiteHeader({
 
     const [signingOut, setSigningOut] =
         useState(false);
-    const [scrolled, setScrolled] = useState(false);
 
     const toast = useToast();
-
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return;
-        }
-
-        const handleScroll = () => {
-            setScrolled(window.scrollY > 40);
-        };
-
-        handleScroll();
-        window.addEventListener('scroll', handleScroll, { passive: true });
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
 
     async function handleLogout() {
         setSigningOut(true);
@@ -95,12 +79,6 @@ export default function SiteHeader({
     const isAdmin = user?.role === 'admin';
     const isStaff = user?.role === 'staff';
     const isCustomer = user?.role === 'customer';
-
-    const isHome = pathname === '/';
-    const headerClassName = [styles.header, isHome ? styles.headerTransparent : '']
-        .filter(Boolean)
-        .join(' ');
-    const scrolledClassName = scrolled ? styles.headerScrolled : '';
 
     return (
         <header className={styles.header}>

@@ -4,10 +4,6 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
-  Layers,
-  Sparkles,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useMemo, useState, useTransition } from 'react';
@@ -40,8 +36,6 @@ function DynamicPricingControlInternal() {
 
   const fetchStatus = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
       const [resStatus, resRules] = await Promise.all([
         fetch('/api/admin/pricing/status', { cache: 'no-store' }),
         fetch('/api/admin/pricing/rules', { cache: 'no-store' }),

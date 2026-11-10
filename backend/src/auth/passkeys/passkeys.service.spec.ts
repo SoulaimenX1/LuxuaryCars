@@ -368,7 +368,7 @@ describe('PasskeysService & PasskeyStorageService (Hardened Fail-Closed)', () =>
             const ch = 'typeorm-tuple-challenge';
             const mockDbWithTuple = {
                 isInitialized: true,
-                query: vi.fn(async (sql: string, params?: any[]) => {
+                query: vi.fn(async (sql: string, _params?: any[]) => {
                     if (sql.includes('DELETE FROM webauthn_challenges')) {
                         return [
                             [

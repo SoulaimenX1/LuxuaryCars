@@ -1,7 +1,6 @@
 'use client';
 
 import {
-    BarChart3,
     CalendarCheck,
     Car,
     CreditCard,
@@ -148,12 +147,13 @@ export default function AdminLayout({
     const [mobileNavOpen, setMobileNavOpen] =
         useState(false);
 
-    const toast = useToast();
-
-    // Auto-close mobile navigation drawer on route change
-    useEffect(() => {
+    const [prevPathname, setPrevPathname] = useState(pathname);
+    if (pathname !== prevPathname) {
+        setPrevPathname(pathname);
         setMobileNavOpen(false);
-    }, [pathname]);
+    }
+
+    const toast = useToast();
 
     // ========================================================
     // VÉRIFIER LA SESSION ADMIN

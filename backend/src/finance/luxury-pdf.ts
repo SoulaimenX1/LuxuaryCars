@@ -809,7 +809,7 @@ function buildLuxuryReceiptPage(
   subtitle: string,
   lines: string[],
   options?: LuxuryDocumentOptions,
-  decodedImage?: DecodedPng | null,
+  _decodedImage?: DecodedPng | null,
 ): string[] {
   const p: string[] = [
     // Top Obsidian Banner
@@ -972,7 +972,6 @@ export function createLuxuryPdf(
 ): Buffer {
   const isInvoice = title.toUpperCase().includes('INVOICE');
   const isReceipt = title.toUpperCase().includes('RECEIPT');
-  const isContract = !isInvoice && !isReceipt;
 
   const image = options?.imageBuffer ? decodePngSafe(options.imageBuffer) : null;
 

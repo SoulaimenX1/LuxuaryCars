@@ -127,6 +127,9 @@ describe('Admin Dynamic Pricing Control & Security', () => {
                 String(call[0]).includes('INSERT INTO platform_settings'),
             );
             expect(upsertCall).toBeDefined();
+            if (!upsertCall) {
+                throw new Error('Expected platform_settings query to be called');
+            }
             expect(upsertCall[1]).toContain('true');
             expect(upsertCall[1]).toContain('admin-uuid-1');
 
@@ -134,6 +137,9 @@ describe('Admin Dynamic Pricing Control & Security', () => {
                 String(call[0]).includes('DYNAMIC_PRICING_TOGGLED'),
             );
             expect(auditCall).toBeDefined();
+            if (!auditCall) {
+                throw new Error('Expected DYNAMIC_PRICING_TOGGLED query to be called');
+            }
             expect(auditCall[1][0]).toBe('admin-uuid-1');
             const auditPayload = JSON.parse(auditCall[1][1]);
             expect(auditPayload.enabled).toBe(true);

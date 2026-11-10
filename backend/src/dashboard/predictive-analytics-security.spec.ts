@@ -2,8 +2,6 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { DataSource } from 'typeorm';
 import { PricingDemandIntelligenceService } from './pricing-demand-intelligence.service.js';
 import { VehiclesService } from '../vehicles/vehicles.service.js';
-import { DashboardController } from './dashboard.controller.js';
-import { UserRole } from '../users/entities/user.entity.js';
 import { BadRequestException } from '@nestjs/common';
 
 describe('P7 Predictive Analytics & Security Guardrails', () => {

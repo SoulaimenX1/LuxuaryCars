@@ -12,12 +12,9 @@ import {
   AlertTriangle,
   Car,
   Calendar,
-  CreditCard,
   Mail,
   Phone,
-  MapPin,
   CheckCircle2,
-  Clock,
   Ban,
   ArrowLeft,
   Copy,
@@ -106,10 +103,7 @@ export default function AdminCustomersPage() {
   const confirm = useConfirm();
   const toast = useToast();
 
-  const loadCustomers = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError('');
+  const loadCustomers = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/customers', { cache: 'no-store' });
       if (!response.ok) throw new Error(`Unable to load customers (HTTP ${response.status}).`);
@@ -220,29 +214,23 @@ export default function AdminCustomersPage() {
   }, [customers, search, statusFilter, verificationFilter]);
 
   // Intelligent selection: auto-select first item when appropriate so right panel is NEVER empty!
-  useEffect(() => {
-    if (visible.length === 0) {
-      // No match, clear selection
-      setSelectedId(null);
-    } else if (!selectedId || !visible.some((c) => c.id === selectedId)) {
-      // Current selection is not in visible set, select the first visible customer
-      setSelectedId(visible[0].id);
-    }
-  }, [visible, selectedId]);
+  const activeSelectedId = visible.some((c) => c.id === selectedId)
+    ? selectedId
+    : (visible[0]?.id ?? null);
 
   // Keep selected customer box fully in view in the roster list
   useEffect(() => {
-    if (selectedId) {
-      const el = document.querySelector<HTMLButtonElement>(`button[data-customer-id="${selectedId}"]`);
+    if (activeSelectedId) {
+      const el = document.querySelector<HTMLButtonElement>(`button[data-customer-id="${activeSelectedId}"]`);
       if (el) {
         el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       }
     }
-  }, [selectedId]);
+  }, [activeSelectedId]);
 
   const selected = useMemo(
-    () => customers.find((customer) => customer.id === selectedId) ?? null,
-    [customers, selectedId],
+    () => customers.find((customer) => customer.id === activeSelectedId) ?? null,
+    [customers, activeSelectedId],
   );
 
   // Quick metrics
@@ -331,7 +319,10 @@ export default function AdminCustomersPage() {
           <button
             type="button"
             className={styles.refreshBtn}
-            onClick={() => void loadCustomers(true)}
+            onClick={() => {
+              setRefreshing(true);
+              void loadCustomers();
+            }}
             disabled={loading || refreshing}
             title="Refresh customer database"
           >
@@ -453,7 +444,7 @@ export default function AdminCustomersPage() {
               </div>
             ) : (
               visible.map((customer) => {
-                const isSelected = customer.id === selectedId;
+                const isSelected = customer.id === activeSelectedId;
                 const initials = getInitials(customer.firstName, customer.lastName);
                 const hasLicense = Boolean(customer.profile?.licenseNumber);
                 const bookingsCount = customer.reservations.length;

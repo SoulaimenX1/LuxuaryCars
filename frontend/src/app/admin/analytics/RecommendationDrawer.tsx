@@ -5,8 +5,6 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  TrendingDown,
-  TrendingUp,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -79,7 +77,6 @@ export default function RecommendationDrawer({
   const runSimulation = useCallback(
     async (rec: Recommendation, price: number, days: number) => {
       try {
-        setSimLoading(true);
         const res = await fetch(
           `/api/admin/dashboard/pricing-demand/recommendations/${encodeURIComponent(
             rec.recommendationId,
@@ -115,7 +112,9 @@ export default function RecommendationDrawer({
   );
 
   // Initialize drawer inputs when recommendation changes
-  useEffect(() => {
+  const [prevRec, setPrevRec] = useState<Recommendation | null>(null);
+  if (recommendation !== prevRec) {
+    setPrevRec(recommendation);
     if (recommendation) {
       const initialPrice =
         recommendation.suggestedPriceMax || recommendation.currentDailyPrice;
@@ -127,9 +126,16 @@ export default function RecommendationDrawer({
         `Approved recommendation for ${recommendation.brand} ${recommendation.model} (${recommendation.licensePlate})`,
       );
       setShowApplyConfirm(false);
-      void runSimulation(recommendation, initialPrice, 3);
     } else {
       setSimResult(null);
+    }
+  }
+
+  useEffect(() => {
+    if (recommendation) {
+      const initialPrice =
+        recommendation.suggestedPriceMax || recommendation.currentDailyPrice;
+      void runSimulation(recommendation, initialPrice, 3);
     }
   }, [recommendation, runSimulation]);
 
@@ -425,6 +431,7 @@ export default function RecommendationDrawer({
                       setCustomPrice(e.target.value);
                       const val = parseFloat(e.target.value);
                       if (!isNaN(val) && val >= 50 && val <= 50000) {
+                        setSimLoading(true);
                         void runSimulation(recommendation, val, rentalDays);
                       }
                     }}
@@ -445,6 +452,7 @@ export default function RecommendationDrawer({
                       onClick={() => {
                         setRentalDays(d);
                         if (isValidPrice) {
+                          setSimLoading(true);
                           void runSimulation(recommendation, numericCustomPrice, d);
                         }
                       }}

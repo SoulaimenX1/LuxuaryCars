@@ -211,6 +211,9 @@ describe('AuthService', () => {
         });
 
         // Verify JWT & refresh token generation
+        if (!('refreshToken' in result) || typeof result.refreshToken !== 'string') {
+            throw new Error('Expected refreshToken in login result');
+        }
         expect(result.accessToken).toBe(
             'test-access-token',
         );

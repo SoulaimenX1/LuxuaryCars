@@ -13,17 +13,24 @@ import {
 import type {
   DisposableDatabase,
 } from './support/itest-database.js';
+import { AuthRateLimiter } from '../src/auth/rate-limit/auth-rate-limiter.service.js';
 
 // ==========================================================
-// TESTS D'INTÉGRATION HTTP — LIMITATION DE DÉBIT AUTH
+// TESTS D'INTÉGRATION HTTP — LIMITATION DE DÉBIT AUTH (P2)
 // ==========================================================
 //
 // Démarre la VRAIE application NestJS et limite volontairement les
 // seuils (via overrideProvider) pour observer le comportement réel :
 //
-//   - l'inscription est bloquée en HTTP 429 après N requêtes par IP ;
+//   - l'inscription est bloquée en HTTP 429 après N requêtes par IP/compte ;
 //   - la connexion est bloquée en HTTP 429 après N tentatives par compte ;
-//   - la réponse 429 expose l'en-tête `Retry-After`.
+//   - verify-email/request et password-reset/request sont limités de
+//     manière identique pour les comptes existants et inconnus, sans
+//     bloquer la connexion (/auth/login) ;
+//   - la réponse 429 expose l'en-tête `Retry-After` ;
+//   - les en-têtes X-Forwarded-For non fiables et les variations de casse
+//     sur l'email ne permettent pas de contourner les limites ;
+//   - l'inscription avec un email déjà existant ne révèle pas de 409.
 //
 // La base de développement n'est jamais touchée.
 
@@ -45,8 +52,14 @@ const CUSTOMER_PASSWORD = 'CustomerPass123!';
 const TEST_RATE_LIMIT = {
   windowMs: 60_000,
   registerMaxPerIp: 3,
+  registerMaxPerAccount: 2,
   loginMaxPerIp: 1_000,
   loginMaxPerAccount: 3,
+  verifyEmailRequestMaxPerIp: 100,
+  verifyEmailRequestMaxPerAccount: 2,
+  passwordResetRequestMaxPerIp: 100,
+  passwordResetRequestMaxPerAccount: 2,
+  trustProxy: false,
 };
 
 let database: DisposableDatabase;
@@ -92,10 +105,10 @@ describe('Limitation de débit (PostgreSQL réel + NestJS)', () => {
   });
 
   // --------------------------------------------------------
-  // INSCRIPTION : limite par IP
+  // INSCRIPTION : limite par IP + anti-usurpation X-Forwarded-For
   // --------------------------------------------------------
 
-  it('autorise les inscriptions sous le seuil puis bloque en 429', async () => {
+  it('autorise les inscriptions sous le seuil puis bloque en 429 (même avec X-Forwarded-For usurpé)', async () => {
     const server = app.getHttpServer();
 
     for (let index = 0; index < TEST_RATE_LIMIT.registerMaxPerIp; index += 1) {
@@ -112,6 +125,7 @@ describe('Limitation de débit (PostgreSQL réel + NestJS)', () => {
 
     const blocked = await request(server)
       .post('/auth/register')
+      .set('X-Forwarded-For', '203.0.113.99')
       .send({
         firstName: 'Rate',
         lastName: 'Blocked',
@@ -155,4 +169,117 @@ describe('Limitation de débit (PostgreSQL réel + NestJS)', () => {
       .send({ email: 'ratelimit.register.0@example.com', password: 'RateLimitPass123!' })
       .expect(200);
   });
+
+  // --------------------------------------------------------
+  // VERIFY-EMAIL & PASSWORD-RESET : limites identiques (existant/inconnu)
+  // et isolation vis-à-vis de /auth/login
+  // --------------------------------------------------------
+
+  it('limite verify-email/request et password-reset/request de manière identique (existant ou inconnu) sans bloquer login', async () => {
+    const server = app.getHttpServer();
+    const existingEmail = 'ratelimit.register.1@example.com';
+    const unknownEmail = 'ratelimit.unknown.target@example.com';
+
+    // 1. Email verification request: existing vs unknown both block on 3rd attempt
+    for (const email of [existingEmail, unknownEmail]) {
+      for (
+        let i = 0;
+        i < TEST_RATE_LIMIT.verifyEmailRequestMaxPerAccount;
+        i += 1
+      ) {
+        await request(server)
+          .post('/auth/verify-email/request')
+          .send({ email })
+          .expect(200);
+      }
+
+      const blockedVerify = await request(server)
+        .post('/auth/verify-email/request')
+        .send({ email: email.toUpperCase() })
+        .expect(429);
+
+      expect(Number(blockedVerify.headers['retry-after'])).toBeGreaterThan(0);
+    }
+
+    // 2. Password reset request: existing vs unknown both block on 3rd attempt
+    for (const email of [existingEmail, unknownEmail]) {
+      for (
+        let i = 0;
+        i < TEST_RATE_LIMIT.passwordResetRequestMaxPerAccount;
+        i += 1
+      ) {
+        await request(server)
+          .post('/auth/password-reset/request')
+          .send({ email })
+          .expect(200);
+      }
+
+      const blockedReset = await request(server)
+        .post('/auth/password-reset/request')
+        .send({ email: `  ${email.toUpperCase()}  ` })
+        .expect(429);
+
+      expect(Number(blockedReset.headers['retry-after'])).toBeGreaterThan(0);
+    }
+
+    // 3. Even though verify-email and password-reset are exhausted for existingEmail,
+    // the legitimate user can still log in at /auth/login!
+    await request(server)
+      .post('/auth/login')
+      .send({ email: existingEmail, password: 'RateLimitPass123!' })
+      .expect(200);
+  }, 20000);
+
+  // --------------------------------------------------------
+  // INSCRIPTION : mitigation 409 (anti-énumération) + limite par compte
+  // --------------------------------------------------------
+
+  it('mitige la fuite 409 sur /auth/register et bloque après N tentatives pour le même email', async () => {
+    const server = app.getHttpServer();
+    app.get(AuthRateLimiter).reset();
+
+    // Registering with an already-existing email returns 201 (not 409),
+    // does not leak the real user ID, and does not overwrite the password.
+    const dupRes1 = await request(server)
+      .post('/auth/register')
+      .send({
+        firstName: 'Probe',
+        lastName: 'One',
+        email: CUSTOMER_EMAIL,
+        password: 'AttackerPassword999!',
+      })
+      .expect(201);
+
+    expect(dupRes1.body.id).not.toBe(CUSTOMER_ID);
+    expect(dupRes1.body.email).toBe(CUSTOMER_EMAIL);
+
+    await request(server)
+      .post('/auth/register')
+      .send({
+        firstName: 'Probe',
+        lastName: 'Two',
+        email: CUSTOMER_EMAIL.toUpperCase(),
+        password: 'AttackerPassword999!',
+      })
+      .expect(201);
+
+    // 3rd attempt for the same email is rate-limited (registerMaxPerAccount = 2)
+    const blockedDup = await request(server)
+      .post('/auth/register')
+      .send({
+        firstName: 'Probe',
+        lastName: 'Three',
+        email: CUSTOMER_EMAIL,
+        password: 'AttackerPassword999!',
+      })
+      .expect(429);
+
+    expect(Number(blockedDup.headers['retry-after'])).toBeGreaterThan(0);
+
+    // Original account credentials remain intact
+    await request(server)
+      .post('/auth/login')
+      .send({ email: CUSTOMER_EMAIL, password: CUSTOMER_PASSWORD })
+      .expect(200);
+  }, 20000);
 });

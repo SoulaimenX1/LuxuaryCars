@@ -8,7 +8,6 @@ import {
   Clock,
   Car,
   FileText,
-  Download,
   Search,
   X,
   RefreshCw,
@@ -20,8 +19,6 @@ import {
   CheckCircle,
   ArrowRight,
   ShieldCheck,
-  Copy,
-  Check,
   PhoneCall,
   Sparkles,
 } from 'lucide-react';
@@ -140,7 +137,6 @@ export default function MyRentalsPage() {
   const [filter, setFilter] = useState<Filter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedDetails, setExpandedDetails] = useState<Record<string, boolean>>({});
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   // Contract Modal state
   const [activeContract, setActiveContract] = useState<RentalContractData | null>(null);
@@ -262,14 +258,6 @@ export default function MyRentalsPage() {
       ...prev,
       [id]: !prev[id],
     }));
-  }
-
-  function copyToClipboard(text: string, key: string) {
-    void navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setTimeout(() => {
-      setCopiedKey((curr) => (curr === key ? null : curr));
-    }, 2000);
   }
 
   function handleOpenContract(rental: CustomerRental, vImg?: string | null) {
@@ -516,9 +504,6 @@ export default function MyRentalsPage() {
               let step = 2; // Active In Custody
               if (rental.status === 'returned') step = 3;
               if (rental.status === 'closed') step = 4;
-
-              const contractCopyKey = `ctr-${rental.id}`;
-              const resCopyKey = `res-${rental.id}`;
 
               return (
                 <article key={rental.id} className={styles.card}>

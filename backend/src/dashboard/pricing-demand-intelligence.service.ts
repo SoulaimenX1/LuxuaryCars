@@ -261,7 +261,7 @@ export class PricingDemandIntelligenceService {
 
     if (this.dynamicPricingService) {
       try {
-        dynamicPricingActive = await this.dynamicPricingService.isEnabled();
+        dynamicPricingActive = this.dynamicPricingService.isEnabled();
 
         const currentCalc = await this.dynamicPricingService.calculate({
           vehicleId: vehicle.id,

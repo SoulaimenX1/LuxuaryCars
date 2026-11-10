@@ -12,16 +12,10 @@ import {
   RefreshCw,
   FileText,
   CreditCard,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Check,
   AlertCircle,
   Car,
-  ShieldCheck,
   ArrowRight,
   Key,
-  Download,
 } from 'lucide-react';
 
 import styles from './reservations.module.css';
@@ -35,7 +29,6 @@ import {
   getDetailedStatusLabel,
   getReservationCategory,
   getReservationStepIndex,
-  getStatusExplanation,
 } from '@/lib/reservation-status';
 import RentalContractModal, {
   type RentalContractData,
@@ -187,7 +180,6 @@ export default function MyReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyNumber, setBusyNumber] = useState<string | null>(null);
-  const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState<number | null>(null);
 
   // Filters UI: ALL or one of the strict 6 categories
@@ -196,7 +188,6 @@ export default function MyReservationsPage() {
   const [sortOrder, setSortOrder] = useState<
     'pickup_nearest' | 'created_newest' | 'amount_highest' | 'pickup_latest'
   >('pickup_nearest');
-  const [expandedDossier, setExpandedDossier] = useState<Record<string, boolean>>({});
 
   // Contract Modal state
   const [activeContract, setActiveContract] = useState<RentalContractData | null>(null);
@@ -519,19 +510,6 @@ export default function MyReservationsPage() {
     });
   }
 
-  function handleCopyReference(ref: string) {
-    navigator.clipboard.writeText(ref).catch(() => null);
-    setCopiedNumber(ref);
-    setTimeout(() => setCopiedNumber(null), 2000);
-  }
-
-  function toggleDossier(id: string) {
-    setExpandedDossier((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  }
-
   // ========================================================
   // MAIN RENDER
   // ========================================================
@@ -753,9 +731,6 @@ export default function MyReservationsPage() {
                 reservation.status === 'completed' ||
                 (reservation.status === 'converted' && reservation.rentalStatus === 'closed');
               const isRejected = statusMeta.category === 'Rejected';
-
-              const finance = financialByReservation[reservation.id];
-              const isDossierOpen = !!expandedDossier[reservation.id];
 
               return (
                 <article key={reservation.id || reservation.reservationNumber} className={styles.card}>

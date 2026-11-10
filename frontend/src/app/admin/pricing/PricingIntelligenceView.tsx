@@ -1,24 +1,15 @@
 'use client';
 
 import {
-  AlertTriangle,
   BarChart3,
-  Calendar,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Clock,
-  ExternalLink,
   Flame,
-  Layers,
   Power,
   RefreshCw,
   Sparkles,
-  TrendingDown,
   TrendingUp,
-  Users,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useToast } from '@/components/toast';
 import type {
@@ -39,7 +30,6 @@ export default function PricingIntelligenceView() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Horizon selector for demand chart (7, 14, 30 days)
   const [activeHorizon, setActiveHorizon] = useState<7 | 14 | 30>(7);
@@ -65,12 +55,8 @@ export default function PricingIntelligenceView() {
   // ---------------------------------------------------------------------------
   // Data Fetching
   // ---------------------------------------------------------------------------
-  const fetchAllData = useCallback(async (isManualRefresh = false) => {
+  const fetchAllData = useCallback(async () => {
     try {
-      if (isManualRefresh) setRefreshing(true);
-      else setLoading(true);
-      setError(null);
-
       const [statusRes, rulesRes, overviewRes] = await Promise.all([
         fetch('/api/admin/pricing/status', { cache: 'no-store' }),
         fetch('/api/admin/pricing/rules', { cache: 'no-store' }),
@@ -93,12 +79,12 @@ export default function PricingIntelligenceView() {
         setAnalytics(overviewData);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to query pricing & intelligence services.');
+      toast.error(err instanceof Error ? err.message : 'Unable to query pricing & intelligence services.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [toast]);
 
   useEffect(() => {
     void fetchAllData();
@@ -252,33 +238,36 @@ export default function PricingIntelligenceView() {
   const isPricingActive = Boolean(status?.enabled);
 
   // 1. Current forecast for selected horizon
+  const forecasts = analytics?.forecasts;
   const currentForecast = useMemo(() => {
-    if (!analytics?.forecasts || analytics.forecasts.length === 0) return null;
+    if (!forecasts || forecasts.length === 0) return null;
     return (
-      analytics.forecasts.find((f) => f.horizonDays === activeHorizon) ||
-      analytics.forecasts[0]
+      forecasts.find((f) => f.horizonDays === activeHorizon) ||
+      forecasts[0]
     );
-  }, [analytics?.forecasts, activeHorizon]);
+  }, [forecasts, activeHorizon]);
 
   // 2. Fleet Utilization (weighted average from categories)
+  const categories = analytics?.categories;
   const fleetUtilization = useMemo(() => {
-    if (!analytics?.categories || analytics.categories.length === 0) return '72%';
-    const totalFleet = analytics.categories.reduce((s, c) => s + c.fleetCount, 0);
+    if (!categories || categories.length === 0) return '72%';
+    const totalFleet = categories.reduce((s, c) => s + c.fleetCount, 0);
     if (totalFleet === 0) return '68%';
-    const weightedOcc = analytics.categories.reduce((s, c) => {
+    const weightedOcc = categories.reduce((s, c) => {
       const occ = c.occupancyPercent !== undefined ? c.occupancyPercent : c.utilizationScore;
       return s + occ * c.fleetCount;
     }, 0);
     const avg = Math.round(weightedOcc / totalFleet);
     return `${Math.min(100, Math.max(10, avg))}%`;
-  }, [analytics?.categories]);
+  }, [categories]);
 
   // 3. Deduplicated recommendations
+  const recommendations = analytics?.recommendations;
   const uniqueRecommendations = useMemo(() => {
-    if (!analytics?.recommendations) return [];
+    if (!recommendations) return [];
     const seen = new Set<string>();
     const list: Recommendation[] = [];
-    for (const r of analytics.recommendations) {
+    for (const r of recommendations) {
       const key = `${r.licensePlate.toUpperCase()}`;
       if (!seen.has(key)) {
         seen.add(key);
@@ -286,7 +275,7 @@ export default function PricingIntelligenceView() {
       }
     }
     return list;
-  }, [analytics?.recommendations]);
+  }, [recommendations]);
 
   // 4. Active Rules & History Rules
   const activeRules = useMemo(() => rules.filter((r) => r.status === 'active'), [rules]);
@@ -325,7 +314,10 @@ export default function PricingIntelligenceView() {
           <button
             type="button"
             className={styles.btnRefresh}
-            onClick={() => void fetchAllData(true)}
+            onClick={() => {
+              setRefreshing(true);
+              void fetchAllData();
+            }}
             disabled={refreshing || loading}
             aria-label="Refresh pricing data"
           >

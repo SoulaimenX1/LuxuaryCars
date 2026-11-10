@@ -7,7 +7,7 @@ export interface PasskeyCredentialRecord {
     id: string;
     userId: string;
     credentialId: string;
-    publicKey: Uint8Array;
+    publicKey: Uint8Array<ArrayBuffer>;
     counter: number;
     deviceType: CredentialDeviceType;
     backedUp: boolean;

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   useEffect,
   useState,
-  type FormEvent,
 } from 'react';
 import {
   ArrowRight,
@@ -14,7 +13,6 @@ import {
   Car,
 } from 'lucide-react';
 
-import { useToast } from '@/components/toast';
 import styles from './account.module.css';
 
 // ==========================================================
@@ -77,7 +75,6 @@ function formatDate(val: string | null | undefined): string {
 
 export default function AccountPage() {
   const router = useRouter();
-  const toast = useToast();
 
   const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);

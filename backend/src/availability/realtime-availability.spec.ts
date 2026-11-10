@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { AvailabilityService } from './availability.service.js';
 import { LocationsService } from '../locations/locations.service.js';

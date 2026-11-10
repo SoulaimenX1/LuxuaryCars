@@ -21,18 +21,14 @@ import {
     Search,
     X,
     Filter,
-    ArrowUpDown,
     Eye,
-    Settings,
     Edit3,
     Camera,
     ExternalLink,
     Check,
     Copy,
     Plus,
-    ChevronRight,
     Gauge,
-    Fuel,
     Zap,
     Car,
     ShieldCheck,
@@ -577,9 +573,18 @@ export default function AdminVehiclesPage() {
     const [fleetSort, setFleetSort] = useState<
         'default' | 'price-asc' | 'price-desc' | 'year-desc' | 'year-asc' | 'name-asc' | 'mileage-asc'
     >('default');
-    const [inspectingVehicle, setInspectingVehicle] = useState<Vehicle | null>(null);
+    const [inspectingVehicleId, setInspectingVehicleId] = useState<string | null>(null);
     const [copiedVin, setCopiedVin] = useState(false);
     const [drawerActivePhotoIndex, setDrawerActivePhotoIndex] = useState(0);
+    const inspectingVehicle = useMemo(
+        () => (inspectingVehicleId ? data.vehicles.find((v) => v.id === inspectingVehicleId) ?? null : null),
+        [data.vehicles, inspectingVehicleId],
+    );
+    const setInspectingVehicle = useCallback((vehicle: Vehicle | null) => {
+        setDrawerActivePhotoIndex(0);
+        setCopiedVin(false);
+        setInspectingVehicleId(vehicle?.id ?? null);
+    }, [setDrawerActivePhotoIndex, setCopiedVin, setInspectingVehicleId]);
 
     // ========================================================
     // CHARGEMENT DES DONNÉES
@@ -970,7 +975,7 @@ export default function AdminVehiclesPage() {
         } catch {
             // Fallback clipboard handling
         }
-    }, [toast]);
+    }, [setCopiedVin, toast]);
 
     useEffect(() => {
         function handleKeyDown(e: KeyboardEvent) {
@@ -980,20 +985,7 @@ export default function AdminVehiclesPage() {
         }
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [inspectingVehicle]);
-
-    useEffect(() => {
-        setDrawerActivePhotoIndex(0);
-        setCopiedVin(false);
-    }, [inspectingVehicle?.id]);
-
-    useEffect(() => {
-        if (!inspectingVehicle) return;
-        const fresh = data.vehicles.find((v) => v.id === inspectingVehicle.id);
-        if (fresh && fresh !== inspectingVehicle) {
-            setInspectingVehicle(fresh);
-        }
-    }, [data.vehicles, inspectingVehicle]);
+    }, [inspectingVehicle, setInspectingVehicle]);
 
     function handleOpenEditVehicle(vehicle: Vehicle) {
         selectVehicleForEdit(vehicle.id);
@@ -1135,7 +1127,6 @@ export default function AdminVehiclesPage() {
 
     // Valeurs scalaires prêtes à l'affichage (évite toute
     // dépendance au rétrécissement de type dans les rappels).
-    const selectedMediaId = selectedMediaVehicle?.id ?? '';
     const selectedMediaBrandName = selectedMediaBrand?.name ?? 'Luxury';
     const selectedMediaModelName = selectedMediaVehicle?.model.name ?? '';
     const selectedMediaYear = selectedMediaVehicle?.manufactureYear ?? null;
@@ -2090,14 +2081,6 @@ export default function AdminVehiclesPage() {
     // ========================================================
     // INTERFACE
     // ========================================================
-
-    // Nombre de voitures sans photo (utile pour l'onglet Médias).
-    const vehiclesWithoutPhoto = data.vehicles.filter(
-        (vehicle) =>
-            !(vehicle.images ?? []).some(
-                (item) => item.mediaType === 'image',
-            ),
-    ).length;
 
     // Classe d'une section selon l'onglet actif : les sections
     // des autres onglets sont masquées (display: none).

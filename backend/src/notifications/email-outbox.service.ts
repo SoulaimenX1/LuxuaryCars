@@ -2034,7 +2034,6 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
         expiresAt: Date | string;
     }): Promise<void> {
         await this.ensureSchema();
-        const expiresIso = new Date(input.expiresAt).toISOString();
         const customerName = input.customerName?.trim() || 'Valued Client';
         const frontendBaseUrl =
             process.env.FRONTEND_URL ||

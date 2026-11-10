@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MfaService } from './mfa.service.js';
-import { MfaGuard } from '../guards/mfa.guard.js';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard.js';
 import { RolesGuard } from '../guards/roles.guard.js';
 import { AuthService } from '../auth.service.js';
@@ -25,15 +24,6 @@ describe('LUXURYCARS — Comprehensive MFA Readiness Validation', () => {
         status: AccountStatus.ACTIVE,
         passwordHash: '',
         phone: null,
-        birthDate: null,
-        driverLicenseNumber: null,
-        driverLicenseExpiry: null,
-        driverLicenseCountry: null,
-        address: null,
-        city: null,
-        postalCode: null,
-        country: null,
-        preferences: null,
         lastLoginAt: null,
         emailVerifiedAt: new Date(),
         createdAt: new Date(),
@@ -41,10 +31,18 @@ describe('LUXURYCARS — Comprehensive MFA Readiness Validation', () => {
     };
 
     const mockCustomer: User = {
-        ...mockAdmin,
         id: '33333333-3333-3333-3333-333333333333',
         email: 'customer@luxuar.demo',
+        firstName: 'System',
+        lastName: 'Admin',
         role: UserRole.CUSTOMER,
+        status: AccountStatus.ACTIVE,
+        passwordHash: '',
+        phone: null,
+        lastLoginAt: null,
+        emailVerifiedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
     };
 
     beforeEach(async () => {

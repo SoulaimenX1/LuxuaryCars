@@ -117,14 +117,22 @@ export class ReservationsService {
     ): Promise<Reservation> {
 
         // ------------------------------------------
-        // A. VÉRIFIER L'EMAIL VÉRIFIÉ DU CLIENT
+        // A. VÉRIFIER LE STATUT ET L'EMAIL VÉRIFIÉ DU CLIENT
         // ------------------------------------------
         const userRows = await this.dataSource.query(
             `SELECT id, email, email_verified_at, status FROM users WHERE id = $1`,
             [userId],
         );
         const user = userRows?.[0];
-        if (!user || !user.email_verified_at) {
+        if (!user || user.status !== 'active') {
+            throw new ForbiddenException({
+                statusCode: 403,
+                error: 'Forbidden',
+                code: 'ACCOUNT_NOT_ACTIVE',
+                message: 'Your customer account must be active and verified before creating reservations.',
+            });
+        }
+        if (!user.email_verified_at) {
             throw new ForbiddenException({
                 statusCode: 403,
                 error: 'Forbidden',
@@ -135,7 +143,7 @@ export class ReservationsService {
         }
 
         // ------------------------------------------
-        // B. VÉRIFIER LE PROFIL CLIENT
+        // B. VÉRIFIER LE PROFIL ET LE PERMIS DU CLIENT
         // ------------------------------------------
 
         const profile =
@@ -145,9 +153,15 @@ export class ReservationsService {
                 },
             });
 
-        if (!profile) {
+        if (
+            !profile ||
+            !profile.licenseNumber?.trim() ||
+            !profile.licenseCountry?.trim() ||
+            !profile.licenseIssuedOn ||
+            !profile.licenseExpiresOn
+        ) {
             throw new BadRequestException(
-                'Complete your customer profile before booking',
+                'Complete your customer profile and driving licence verification before booking',
             );
         }
 
@@ -406,7 +420,7 @@ export class ReservationsService {
                             // Prix conservés au moment
                             // de la réservation.
                             dailyPrice:
-                                vehicle.daily_price,
+                                quote.dailyPrice,
 
                             depositAmount:
                                 vehicle.security_deposit,
@@ -587,8 +601,13 @@ export class ReservationsService {
             rentalStatus:string|null;noShowDeadlineAt:Date|null;agencyTimezone:string|null;
             rentalStartedAt:Date|null;inspectionMileage:number|null;inspectionFuel:number|null;
             inspectionCondition:string|null;inspectionNotes:string|null;
+            brandName:string|null;modelName:string|null;vehicleName:string|null;imageUrl:string|null;
             returnSummary:unknown}[]=
           await this.reservationsRepository.manager.query(`SELECT r.id AS "reservationId",
+            b.name AS "brandName",
+            m.name AS "modelName",
+            CONCAT(b.name, ' ', m.name) AS "vehicleName",
+            (SELECT vi.storage_path FROM vehicle_images vi WHERE vi.vehicle_id = v.id ORDER BY vi.is_primary DESC, vi.created_at ASC LIMIT 1) AS "imageUrl",
             p.pickup_location_snapshot AS "pickupLocation",
             p.dropoff_location_snapshot AS "dropoffLocation",
             l.started_at AS "checkinAt",l.started_at AS "rentalStartedAt",
@@ -630,6 +649,9 @@ export class ReservationsService {
             CASE WHEN r.status='confirmed' THEN ${deadline} ELSE NULL END AS "noShowDeadlineAt",
             loc.timezone AS "agencyTimezone"
             FROM reservations r
+            JOIN vehicles v ON v.id = r.vehicle_id
+            JOIN vehicle_models m ON m.id = v.model_id
+            JOIN brands b ON b.id = m.brand_id
             LEFT JOIN reservation_preferences p ON p.reservation_id=r.id
             LEFT JOIN rental_locations loc ON loc.id=p.pickup_location_id
             LEFT JOIN rentals l ON l.reservation_id=r.id
@@ -640,6 +662,10 @@ export class ReservationsService {
             WHERE r.id=ANY($1::uuid[])`,[rows.map(r=>r.id),gracePeriodMinutes]);
         const map=new Map(details.map(x=>[x.reservationId,x]));
         for(const r of rows)Object.assign(r,{
+            brandName:map.get(r.id)?.brandName??null,
+            modelName:map.get(r.id)?.modelName??null,
+            vehicleName:map.get(r.id)?.vehicleName??null,
+            imageUrl:map.get(r.id)?.imageUrl??null,
             pickupLocation:map.get(r.id)?.pickupLocation??null,
             dropoffLocation:map.get(r.id)?.dropoffLocation??null,
             checkinAt:map.get(r.id)?.checkinAt??null,
@@ -839,16 +865,18 @@ export class ReservationsService {
                 // --------------------------------------
 
                 // Le client peut annuler lui-même une réservation
-                // encore en attente ou déjà confirmée, tant que la
-                // prise en charge n'a pas commencé.
+                // encore en attente, en attente de paiement, ou déjà confirmée,
+                // tant que la prise en charge n'a pas commencé.
                 if (
                     reservation.status !==
                         ReservationStatus.PENDING &&
                     reservation.status !==
+                        ReservationStatus.AWAITING_PAYMENT &&
+                    reservation.status !==
                         ReservationStatus.CONFIRMED
                 ) {
                     throw new ConflictException(
-                        'Only pending or confirmed reservations can be cancelled',
+                        'Only pending, awaiting payment, or confirmed reservations can be cancelled',
                     );
                 }
 

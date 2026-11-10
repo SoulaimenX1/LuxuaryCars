@@ -56,13 +56,13 @@ export default function ConfirmationPage() {
   const [timezone, setTimezone] = useState('');
 
   useEffect(() => {
-    const controller = new AbortController();
+    let isMounted = true;
 
     void (async () => {
       try {
         const listResponse = await fetch('/api/reservations', {
           cache: 'no-store',
-          signal: controller.signal,
+          
         });
 
         if (listResponse.status === 401) {
@@ -92,7 +92,7 @@ export default function ConfirmationPage() {
         try {
           const catalogResponse = await fetch('/api/vehicles/catalog', {
             cache: 'no-store',
-            signal: controller.signal,
+            
           });
           if (catalogResponse.ok) {
             const catalog: unknown = await catalogResponse.json();
@@ -107,7 +107,7 @@ export default function ConfirmationPage() {
         try {
           const locationResponse = await fetch(`/api/vehicles/${found.vehicleId}/agency`, {
             cache: 'no-store',
-            signal: controller.signal,
+            
           });
           if (locationResponse.ok) {
             const agency = (await locationResponse.json()) as { timezone?: string } | null;
@@ -118,13 +118,12 @@ export default function ConfirmationPage() {
         }
 
         setState('ok');
-      } catch (error) {
-        if (error instanceof DOMException && error.name === 'AbortError') return;
-        setState('error');
+      } catch {
+        if (isMounted) setState('error');
       }
     })();
 
-    return () => controller.abort();
+    return () => { isMounted = false; };
   }, [number]);
 
   if (state === 'loading') {

@@ -63,6 +63,11 @@ import {
     vehicleImagesDir,
 } from './vehicle-images.storage.js';
 
+import {
+    deleteBrandLogoFile,
+    saveBrandLogoFile,
+} from './brand-logos.storage.js';
+
 // ==========================================
 // DTO DE CRÉATION
 // ==========================================
@@ -142,7 +147,31 @@ export class VehiclesService {
     // 1. CONSULTER LES MARQUES
     // ==========================================
 
-    async findAllBrands(): Promise<Brand[]> {
+    async findAllBrands(options?: { inFleetOnly?: boolean }): Promise<Brand[]> {
+        if (options?.inFleetOnly) {
+            const rows = await this.brandsRepository
+                .createQueryBuilder('brand')
+                .innerJoin('vehicle_models', 'model', 'model.brand_id = brand.id')
+                .innerJoin('vehicles', 'vehicle', 'vehicle.model_id = model.id')
+                .where('vehicle.status = :status', { status: VehicleStatus.ACTIVE })
+                .select('brand.id', 'id')
+                .addSelect('brand.name', 'name')
+                .addSelect('brand.logo_url', 'logoUrl')
+                .groupBy('brand.id')
+                .addGroupBy('brand.name')
+                .addGroupBy('brand.logo_url')
+                .orderBy('brand.name', 'ASC')
+                .getRawMany<{ id: string; name: string; logoUrl: string | null }>();
+
+            return rows.map((r) => {
+                const b = new Brand();
+                b.id = r.id;
+                b.name = r.name;
+                b.logoUrl = r.logoUrl ?? null;
+                return b;
+            });
+        }
+
         // Classer les marques par ordre alphabétique.
         return this.brandsRepository.find({
             order: {
@@ -225,6 +254,55 @@ export class VehiclesService {
 
             throw error;
         }
+    }
+
+    // ==========================================
+    // LOGO DE MARQUE (UPLOAD / REMPLACE)
+    // ==========================================
+
+    async uploadBrandLogo(
+        brandId: string,
+        file: UploadedImageFile,
+    ): Promise<Brand> {
+        const brand = await this.brandsRepository.findOne({
+            where: { id: brandId },
+        });
+
+        if (!brand) {
+            throw new NotFoundException(`Brand not found (ID: ${brandId}).`);
+        }
+
+        // Supprimer l'ancien logo si existant
+        if (brand.logoUrl) {
+            await deleteBrandLogoFile(brand.logoUrl);
+        }
+
+        const { storagePath } = await saveBrandLogoFile(brand.name, file);
+        brand.logoUrl = storagePath;
+
+        return this.brandsRepository.save(brand);
+    }
+
+    // ==========================================
+    // SUPPRIMER LE LOGO D'UNE MARQUE
+    // ==========================================
+
+    async deleteBrandLogo(brandId: string): Promise<Brand> {
+        const brand = await this.brandsRepository.findOne({
+            where: { id: brandId },
+        });
+
+        if (!brand) {
+            throw new NotFoundException(`Brand not found (ID: ${brandId}).`);
+        }
+
+        if (brand.logoUrl) {
+            await deleteBrandLogoFile(brand.logoUrl);
+            brand.logoUrl = null;
+            return this.brandsRepository.save(brand);
+        }
+
+        return brand;
     }
 
     // ==========================================
@@ -487,6 +565,10 @@ export class VehiclesService {
             (manager) =>
                 manager.delete(Brand, { id: brand.id }),
         );
+
+        if (brand.logoUrl) {
+            await deleteBrandLogoFile(brand.logoUrl);
+        }
 
         return { deleted: true };
     }
@@ -1416,6 +1498,11 @@ export class VehiclesService {
             .addSelect(
                 'brand.name',
                 'brandName',
+            )
+
+            .addSelect(
+                'brand.logo_url',
+                'brandLogoUrl',
             )
 
             .addSelect(

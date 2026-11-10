@@ -24,19 +24,19 @@ export default function PremiumCustomerPage(){
  const [serviceRating,setServiceRating]=useState(5);
  const [serviceComment,setServiceComment]=useState('');
  useEffect(()=>{
-  const ctrl=new AbortController();
+  let active = true;
   async function load(){try{
    const [f,c,l,r]=await Promise.all([
-    fetch('/api/premium/me/favorites',{signal:ctrl.signal,cache:'no-store'}),
-    fetch('/api/vehicles/catalog',{signal:ctrl.signal,cache:'no-store'}),
-    fetch('/api/premium/me/loyalty',{signal:ctrl.signal,cache:'no-store'}),
-    fetch('/api/premium/me/reviewable',{signal:ctrl.signal,cache:'no-store'})
+    fetch('/api/premium/me/favorites',{cache:'no-store'}),
+    fetch('/api/vehicles/catalog',{cache:'no-store'}),
+    fetch('/api/premium/me/loyalty',{cache:'no-store'}),
+    fetch('/api/premium/me/reviewable',{cache:'no-store'})
    ]);
    if(!f.ok||!c.ok||!l.ok||!r.ok) throw new Error('Please sign in to view your private collection.');
    const [fav,cars,tier,reservs]=await Promise.all([f.json(),c.json(),l.json(),r.json()]);
-   if(!ctrl.signal.aborted){setFavorite(fav);setCatalog(cars);setLoyalty(tier);setReviewable(reservs);}
-  }catch{if(!ctrl.signal.aborted)setError('Unable to load your private collection.');}}
-  void load();return()=>ctrl.abort();
+   if(active){setFavorite(fav);setCatalog(cars);setLoyalty(tier);setReviewable(reservs);}
+  }catch{if(active)setError('Unable to load your private collection.');}}
+  void load();return()=>{active = false;};
  },[]);
  async function removeFavorite(id:string){
   const response=await fetch(`/api/premium/me/favorites/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});

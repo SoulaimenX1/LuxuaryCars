@@ -185,6 +185,15 @@
   --text-soft: var(--muted);
   --accent: var(--champagne);
   --accent-light: var(--champagne-2);
+
+  /* Admin Filter & Form Controls Tokens (Light) */
+  --admin-filter-bg: var(--white);
+  --admin-filter-text: var(--ink);
+  --admin-filter-placeholder: var(--muted-2);
+  --admin-filter-border: var(--line);
+  --admin-filter-border-focus: var(--champagne-2);
+  --admin-filter-radius: 0px;
+  --admin-filter-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238F6E38' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 /* ---------- Obsidienne (thème sombre) — Contrastes éclatants ---------- */
@@ -268,6 +277,15 @@ html[data-theme="dark"] {
   --calendar-reserved-ink: #edd29e;
   --calendar-unavailable-bg: #351e20;
   --calendar-unavailable-ink: #f0b4ad;
+
+  /* Admin Filter & Form Controls Tokens (Dark) */
+  --admin-filter-bg: #1B1B1B;
+  --admin-filter-text: #F5F2EB;
+  --admin-filter-placeholder: #A9A39A;
+  --admin-filter-border: #544936;
+  --admin-filter-border-focus: #C5A46A;
+  --admin-filter-radius: 0px;
+  --admin-filter-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23C5A46A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
 }
 
 /* ==================================================================
@@ -395,6 +413,20 @@ img { height: auto; }
 html[data-theme="dark"] :where(input, select, textarea) { color-scheme: dark; }
 html[data-theme="light"] :where(input, select, textarea) { color-scheme: light; }
 :where(input, textarea)::placeholder { color: var(--muted-3); opacity: 1; }
+html[data-theme="dark"] :where(input, textarea)::placeholder { color: #A9A39A; opacity: 1; }
+html[data-theme="dark"] select option {
+  background-color: #1B1B1B;
+  color: #F5F2EB;
+}
+html[data-theme="dark"] select option:checked,
+html[data-theme="dark"] select option:hover {
+  background-color: #2A2417;
+  color: #F5F2EB;
+}
+html[data-theme="light"] select option {
+  background-color: #ffffff;
+  color: #151412;
+}
 :where(input, select, textarea):disabled { opacity: .55; cursor: not-allowed; }
 :where(button):disabled { opacity: .5; }
 :where([aria-disabled="true"]) { cursor: not-allowed; }

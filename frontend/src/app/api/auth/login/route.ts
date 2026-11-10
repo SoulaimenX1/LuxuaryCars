@@ -5,6 +5,11 @@ import {
 import {
     buildApiUrl,
 } from '@/lib/api';
+import {
+    buildBffForwardedHeaders,
+    extractRetryAfterHeaders,
+    parseBackendJson,
+} from '@/lib/bff-headers';
 
 // ==========================================================
 // TYPES UTILISÉS PAR LA ROUTE
@@ -22,6 +27,9 @@ interface BackendLoginResponse {
     refreshExpiresIn?: number;
 
     tokenType?: string;
+
+    mfaRequired?: boolean;
+    preAuthToken?: string;
 
     user?: {
         id?: string;
@@ -94,10 +102,9 @@ export async function POST(
                 {
                     method: 'POST',
 
-                    headers: {
-                        'Content-Type':
-                            'application/json',
-                    },
+                    headers: buildBffForwardedHeaders(
+                        request,
+                    ),
 
                     body: JSON.stringify({
                         email:
@@ -113,8 +120,10 @@ export async function POST(
             );
 
         const data =
-            await backendResponse
-                .json() as BackendLoginResponse;
+            await parseBackendJson<BackendLoginResponse>(
+                backendResponse,
+                'Unable to authenticate. Please try again.',
+            );
 
         // ------------------------------------------------------
         // ERREUR RETOURNÉE PAR NESTJS
@@ -128,6 +137,28 @@ export async function POST(
                 {
                     status:
                         backendResponse.status,
+                    headers:
+                        extractRetryAfterHeaders(
+                            backendResponse,
+                        ),
+                },
+            );
+        }
+
+        // ------------------------------------------------------
+        // SI MFA REQUISE (SESSION PRE-AUTH RESTREINTE)
+        // ------------------------------------------------------
+
+        if (data.mfaRequired) {
+            return NextResponse.json(
+                {
+                    mfaRequired: true,
+                    preAuthToken: data.preAuthToken,
+                    expiresIn: data.expiresIn,
+                    user: data.user,
+                },
+                {
+                    status: 200,
                 },
             );
         }

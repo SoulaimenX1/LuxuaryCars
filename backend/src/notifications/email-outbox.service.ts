@@ -6,12 +6,31 @@ import {
     Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomUUID } from 'node:crypto';
+import {
+    createCipheriv,
+    createDecipheriv,
+    createHash,
+    hkdfSync,
+    randomBytes,
+    randomUUID,
+} from 'node:crypto';
+import * as fs from 'node:fs';
 import * as net from 'node:net';
+import * as path from 'node:path';
 import * as tls from 'node:tls';
-import { renderLuxuarEmailHtml, renderLuxuarEmailText } from './templates/luxuar-email-layout.js';
 import { DataSource } from 'typeorm';
 import type { Reservation } from '../reservations/entities/reservation.entity.js';
+import {
+    renderLuxuarEmailHtml,
+    renderLuxuarEmailText,
+} from './luxuar-email-template.js';
+
+export interface EmailInlineAttachment {
+    cid: string;
+    filename: string;
+    contentType: string;
+    contentBase64: string;
+}
 
 export type TransactionalEmailTemplate =
     | 'booking_created'
@@ -28,7 +47,8 @@ export type TransactionalEmailTemplate =
     | 'rental_closed'
     | 'deposit_refunded'
     | 'email_verification'
-    | 'password_reset';
+    | 'password_reset'
+    | 'invoice_issued';
 
 export interface EmailMessagePayload {
     outboxId: string;
@@ -36,7 +56,8 @@ export interface EmailMessagePayload {
     from: string;
     subject: string;
     text: string;
-    html?: string;
+    html?: string | null;
+    inlineAttachments?: EmailInlineAttachment[];
     eventKey: string | null;
     templateType: string | null;
 }
@@ -51,6 +72,7 @@ export interface EnqueueEmailInput {
     templateType: TransactionalEmailTemplate;
     subject: string;
     message: string;
+    htmlMessage?: string | null;
     recipientEmail?: string | null;
     notificationId?: string | null;
     maxAttempts?: number;
@@ -84,6 +106,7 @@ interface OutboxRow {
     user_email: string | null;
     subject: string;
     message: string;
+    html_message?: string | null;
     event_key: string | null;
     template_type: string | null;
     notification_id: string | null;
@@ -92,6 +115,76 @@ interface OutboxRow {
 }
 
 const EMAIL_REGEX = /^[^\s@<\r\n]+@[^\s@>\r\n]+\.[^\s@>\r\n]+$/;
+
+const TEST_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
+    'luxuar-test.hu',
+    'test.luxuar.hu',
+    'example.com',
+    'example.org',
+    'example.net',
+    'test.com',
+    'localhost',
+    'local',
+    'test.local',
+    'mailpit.local',
+]);
+
+export function isTestRecipient(email?: string | null): boolean {
+    if (!email || typeof email !== 'string') return false;
+    const clean = email.trim().toLowerCase();
+    const atIndex = clean.lastIndexOf('@');
+    if (atIndex === -1) return false;
+    const domain = clean.slice(atIndex + 1).replace(/>$/, '').trim();
+    if (!domain) return false;
+    if (
+        domain.endsWith('.test') ||
+        domain.endsWith('.example') ||
+        domain.endsWith('.invalid') ||
+        domain.endsWith('.localhost') ||
+        domain === 'localhost'
+    ) {
+        return true;
+    }
+    for (const testDomain of TEST_EMAIL_DOMAINS) {
+        if (domain === testDomain || domain.endsWith(`.${testDomain}`)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+export const OUTBOX_CIPHERTEXT_PREFIX = 'enc:v1:';
+export const REDACTED_OUTBOX_MESSAGE = '[REDACTED AFTER DELIVERY]';
+const OUTBOX_DEFAULT_AAD = 'luxuar:customer_email_outbox:v1';
+const EPHEMERAL_TEST_KEY = randomBytes(32);
+
+export const SENSITIVE_OUTBOX_TEMPLATES: ReadonlySet<string> = new Set([
+    'email_verification',
+    'password_reset',
+    'check_in_code',
+]);
+
+export function isEncryptedOutboxContent(value?: string | null): boolean {
+    return typeof value === 'string' && value.startsWith(OUTBOX_CIPHERTEXT_PREFIX);
+}
+
+export function isSensitiveOutboxTemplate(templateType?: string | null): boolean {
+    return (
+        typeof templateType === 'string' &&
+        SENSITIVE_OUTBOX_TEMPLATES.has(templateType.trim())
+    );
+}
+
+export function containsSensitiveTokenContent(value?: string | null): boolean {
+    if (!value || typeof value !== 'string') return false;
+    return (
+        /(?:verify-email|reset-password)\?[^\s"'<>]*\btoken=/i.test(value) ||
+        /\b(?:Verification token|One-time reset token|One-Time Token):\s*\S+/i.test(
+            value,
+        ) ||
+        /\bone-time check-in code[^:\r\n]*:\s*\S+/i.test(value)
+    );
+}
 
 export function sanitizeHeaderValue(value: string): string {
     return value.replace(/[\r\n]+/g, ' ').trim();
@@ -177,12 +270,64 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
         this.customTransport = transport;
     }
 
-    getSmtpConfigSnapshot(): SmtpConfigSnapshot {
+    private isMailpitActive(): boolean {
+        const nodeEnv = (
+            this.getEnvString('NODE_ENV') ?? 'development'
+        ).toLowerCase();
+        if (nodeEnv === 'production') {
+            return false;
+        }
+        return this.getEnvBoolean('MAILPIT_ENABLED', false);
+    }
+
+    private getMailpitSmtpHost(): string {
+        const candidate = (
+            this.getEnvString('MAILPIT_SMTP_HOST') ?? '127.0.0.1'
+        ).toLowerCase();
+        if (
+            candidate === '127.0.0.1' ||
+            candidate === 'localhost' ||
+            candidate === '::1'
+        ) {
+            return candidate;
+        }
+        throw new Error(
+            `Refusing non-local MAILPIT_SMTP_HOST: ${candidate}`,
+        );
+    }
+
+    getSmtpConfigSnapshot(recipientEmail?: string): SmtpConfigSnapshot {
+        const isTest = recipientEmail ? isTestRecipient(recipientEmail) : true;
+        const mailpitActive = this.isMailpitActive();
         const host = this.getEnvString('SMTP_HOST');
         const user = this.getEnvString('SMTP_USER');
         const password = this.getEnvString('SMTP_PASSWORD');
+        const hasRealSmtp = Boolean(host);
+
+        // Mailpit takes precedence for test recipients or when real SMTP is not configured in non-production
+        if (mailpitActive && (isTest || !hasRealSmtp)) {
+            const mailpitHost = this.getMailpitSmtpHost();
+            const mailpitPort = this.getEnvNumber('MAILPIT_SMTP_PORT', 1025);
+            return {
+                configured: true,
+                host: mailpitHost,
+                port: mailpitPort,
+                secure: false,
+                authEnabled: false,
+                user: null,
+                from: sanitizeHeaderValue(
+                    this.getEnvString('SMTP_FROM') ??
+                        'LUXUAR Concierge <no-reply@luxuar.hu>',
+                ),
+                timeoutMs: this.getEnvNumber('SMTP_TIMEOUT_MS', 10_000),
+                maxAttempts: this.getMaxAttempts(),
+                baseDelayMs: this.getBaseDelayMs(),
+                scanIntervalMs: this.getScanIntervalMs(),
+            };
+        }
+
         return {
-            configured: Boolean(host),
+            configured: hasRealSmtp,
             host: host ?? null,
             port: this.getEnvNumber('SMTP_PORT', 587),
             secure: this.getEnvBoolean('SMTP_SECURE', false),
@@ -215,10 +360,17 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
         let sanitized = raw.replace(/[\r\n]+/g, ' ').trim();
         const password = this.getEnvString('SMTP_PASSWORD');
         const user = this.getEnvString('SMTP_USER');
-        if (password && password.length > 0) {
-            sanitized = sanitized.split(password).join('[REDACTED]');
-            const base64Pass = Buffer.from(password, 'utf8').toString('base64');
-            sanitized = sanitized.split(base64Pass).join('[REDACTED]');
+        const encryptionKey = this.getEnvString('EMAIL_OUTBOX_ENCRYPTION_KEY');
+        const jwtSecret = this.getEnvString('JWT_SECRET');
+
+        for (const secret of [password, encryptionKey, jwtSecret]) {
+            if (secret && secret.length > 0) {
+                sanitized = sanitized.split(secret).join('[REDACTED]');
+                const base64Secret = Buffer.from(secret, 'utf8').toString('base64');
+                sanitized = sanitized.split(base64Secret).join('[REDACTED]');
+                const base64UrlSecret = Buffer.from(secret, 'utf8').toString('base64url');
+                sanitized = sanitized.split(base64UrlSecret).join('[REDACTED]');
+            }
         }
         if (user && password) {
             const plainToken = Buffer.from(
@@ -227,7 +379,146 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
             ).toString('base64');
             sanitized = sanitized.split(plainToken).join('[REDACTED]');
         }
+
+        // Redact verification/reset URLs, raw tokens, check-in codes, and encrypted blobs
+        sanitized = sanitized.replace(
+            /((?:[?&]|\b)token=)[^&\s"'<>]+/gi,
+            '$1[REDACTED]',
+        );
+        sanitized = sanitized.replace(
+            /((?:Verification token|One-time reset token|One-Time Token|Check-In Code)\s*:\s*)\S+/gi,
+            '$1[REDACTED]',
+        );
+        sanitized = sanitized.replace(
+            /(one-time check-in code[^:\r\n]*:\s*)\S+/gi,
+            '$1[REDACTED]',
+        );
+        sanitized = sanitized.replace(
+            /enc:v1:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+/g,
+            '[REDACTED_CIPHERTEXT]',
+        );
+
         return sanitized.slice(0, 500);
+    }
+
+    private resolveEncryptionKey(): Buffer {
+        const explicitKey = this.getEnvString('EMAIL_OUTBOX_ENCRYPTION_KEY');
+        if (explicitKey !== undefined) {
+            if (explicitKey.length < 32) {
+                throw new Error(
+                    'Invalid EMAIL_OUTBOX_ENCRYPTION_KEY: must be at least 32 characters',
+                );
+            }
+            return Buffer.from(
+                hkdfSync(
+                    'sha256',
+                    Buffer.from(explicitKey, 'utf8'),
+                    Buffer.from('luxuar-email-outbox-salt-v1', 'utf8'),
+                    Buffer.from('luxuar-email-outbox-aes-256-gcm-explicit-v1', 'utf8'),
+                    32,
+                ),
+            );
+        }
+
+        const jwtSecret = this.getEnvString('JWT_SECRET');
+        if (jwtSecret && jwtSecret.length >= 32) {
+            return Buffer.from(
+                hkdfSync(
+                    'sha256',
+                    Buffer.from(jwtSecret, 'utf8'),
+                    Buffer.from('luxuar-email-outbox-salt-v1', 'utf8'),
+                    Buffer.from('luxuar-email-outbox-aes-256-gcm-jwt-fallback-v1', 'utf8'),
+                    32,
+                ),
+            );
+        }
+
+        const nodeEnv =
+            this.configService?.get<string>('NODE_ENV') ??
+            process.env.NODE_ENV ??
+            'development';
+        if (nodeEnv === 'production') {
+            throw new Error(
+                'Outbox encryption key is not configured: set EMAIL_OUTBOX_ENCRYPTION_KEY or JWT_SECRET',
+            );
+        }
+
+        return EPHEMERAL_TEST_KEY;
+    }
+
+    shouldProtectContent(
+        templateType?: string | null,
+        message?: string | null,
+        htmlMessage?: string | null,
+    ): boolean {
+        return (
+            isSensitiveOutboxTemplate(templateType) ||
+            isEncryptedOutboxContent(message) ||
+            isEncryptedOutboxContent(htmlMessage) ||
+            containsSensitiveTokenContent(message) ||
+            containsSensitiveTokenContent(htmlMessage)
+        );
+    }
+
+    encryptOutboxContent(
+        plaintext: string,
+        aadContext: string = OUTBOX_DEFAULT_AAD,
+    ): string {
+        if (isEncryptedOutboxContent(plaintext)) {
+            return plaintext;
+        }
+        const key = this.resolveEncryptionKey();
+        const iv = randomBytes(12);
+        const cipher = createCipheriv('aes-256-gcm', key, iv, {
+            authTagLength: 16,
+        });
+        cipher.setAAD(Buffer.from(aadContext, 'utf8'));
+        const encrypted = Buffer.concat([
+            cipher.update(plaintext, 'utf8'),
+            cipher.final(),
+        ]);
+        const authTag = cipher.getAuthTag();
+        return `${OUTBOX_CIPHERTEXT_PREFIX}${iv.toString('base64url')}:${authTag.toString('base64url')}:${encrypted.toString('base64url')}`;
+    }
+
+    decryptOutboxContent(
+        stored: string,
+        aadContext: string = OUTBOX_DEFAULT_AAD,
+    ): string {
+        if (!isEncryptedOutboxContent(stored)) {
+            // Legacy plaintext records are read safely without destructive migration
+            return stored;
+        }
+        const body = stored.slice(OUTBOX_CIPHERTEXT_PREFIX.length);
+        const parts = body.split(':');
+        if (parts.length !== 3 || !parts[0] || !parts[1] || parts[2] === undefined) {
+            throw new Error(
+                'Outbox payload decryption failed: malformed ciphertext envelope',
+            );
+        }
+        try {
+            const iv = Buffer.from(parts[0], 'base64url');
+            const authTag = Buffer.from(parts[1], 'base64url');
+            const ciphertext = Buffer.from(parts[2], 'base64url');
+            if (iv.length !== 12 || authTag.length !== 16) {
+                throw new Error('Invalid IV or authentication tag length');
+            }
+            const key = this.resolveEncryptionKey();
+            const decipher = createDecipheriv('aes-256-gcm', key, iv, {
+                authTagLength: 16,
+            });
+            decipher.setAAD(Buffer.from(aadContext, 'utf8'));
+            decipher.setAuthTag(authTag);
+            const decrypted = Buffer.concat([
+                decipher.update(ciphertext),
+                decipher.final(),
+            ]);
+            return decrypted.toString('utf8');
+        } catch {
+            throw new Error(
+                'Outbox payload decryption failed: invalid key or tampered ciphertext',
+            );
+        }
     }
 
     async ensureSchema(): Promise<void> {
@@ -238,6 +529,7 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
                   ADD COLUMN IF NOT EXISTS event_key varchar(180),
                   ADD COLUMN IF NOT EXISTS template_type varchar(40),
                   ADD COLUMN IF NOT EXISTS recipient_email varchar(255),
+                  ADD COLUMN IF NOT EXISTS html_message text,
                   ADD COLUMN IF NOT EXISTS notification_id uuid REFERENCES user_notifications(id) ON DELETE SET NULL,
                   ADD COLUMN IF NOT EXISTS attempt_count integer NOT NULL DEFAULT 0,
                   ADD COLUMN IF NOT EXISTS max_attempts integer NOT NULL DEFAULT 3,
@@ -275,22 +567,39 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
         const maxAttempts = input.maxAttempts ?? this.getMaxAttempts();
         const subject = sanitizeHeaderValue(input.subject).slice(0, 200);
         const eventKey = input.eventKey.trim().slice(0, 180);
+        const protectAtRest = this.shouldProtectContent(
+            input.templateType,
+            input.message,
+            input.htmlMessage,
+        );
+        const storedMessage = protectAtRest
+            ? this.encryptOutboxContent(input.message)
+            : input.message;
+        const storedHtmlMessage =
+            input.htmlMessage != null && input.htmlMessage.length > 0
+                ? protectAtRest
+                    ? this.encryptOutboxContent(input.htmlMessage)
+                    : input.htmlMessage
+                : (input.htmlMessage ?? null);
 
         // If `ReservationsService.createReservation` already inserted a legacy row
-        // without `event_key` for this exact customer and subject, upgrade that row
+        // without `event_key` for this exact customer, upgrade that row
         // in place instead of creating a duplicate outbox record.
         if (input.templateType === 'booking_created') {
             const upgraded = await this.db.query(
                 `UPDATE customer_email_outbox
-                 SET event_key = $3,
+                 SET subject = $2,
+                     message = $8,
+                     event_key = $3,
                      template_type = $4,
                      notification_id = COALESCE(notification_id, $5::uuid),
                      max_attempts = $6,
+                     html_message = COALESCE($7::text, html_message),
                      updated_at = now()
                  WHERE id = (
                      SELECT id FROM customer_email_outbox
                      WHERE customer_id = $1::uuid
-                       AND subject = $2
+                       AND (subject = $2 OR subject = 'Reservation request received')
                        AND event_key IS NULL
                      ORDER BY created_at DESC
                      LIMIT 1
@@ -307,6 +616,8 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
                     input.templateType,
                     input.notificationId ?? null,
                     maxAttempts,
+                    storedHtmlMessage,
+                    storedMessage,
                 ],
             );
             const upgradedRows: { id: string }[] = Array.isArray(upgraded?.[0])
@@ -329,7 +640,7 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
                 `INSERT INTO customer_email_outbox
                     (customer_id, recipient_email, subject, message, status,
                      event_key, template_type, notification_id, attempt_count,
-                     max_attempts, next_attempt_at, updated_at)
+                     max_attempts, next_attempt_at, updated_at, html_message)
                  SELECT u.id,
                         COALESCE($2::varchar, u.email),
                         $3::varchar,
@@ -341,7 +652,8 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
                         0,
                         $8::int,
                         now(),
-                        now()
+                        now(),
+                        $9::text
                  FROM users u
                  WHERE u.id = $1::uuid
                    AND u.status = 'active'
@@ -353,11 +665,12 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
                     input.customerId,
                     input.recipientEmail ?? null,
                     subject,
-                    input.message,
+                    storedMessage,
                     eventKey,
                     input.templateType,
                     input.notificationId ?? null,
                     maxAttempts,
+                    storedHtmlMessage,
                 ],
             );
 
@@ -398,6 +711,7 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
                                 u.email AS user_email,
                                 o.subject,
                                 o.message,
+                                o.html_message,
                                 o.event_key,
                                 o.template_type,
                                 o.notification_id,
@@ -431,9 +745,6 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
             let sent = 0;
             let retried = 0;
             let failed = 0;
-            const snapshot = this.getSmtpConfigSnapshot();
-            const transport =
-                this.customTransport ?? this.createDefaultTransport(snapshot);
 
             for (const row of claimed) {
                 const nextAttemptCount = Number(row.attempt_count ?? 0) + 1;
@@ -446,75 +757,53 @@ export class EmailOutboxService implements OnModuleInit, OnModuleDestroy {
                     ''
                 ).trim();
 
+                const sensitiveRow = this.shouldProtectContent(
+                    row.template_type,
+                    row.message,
+                    row.html_message,
+                );
+
                 try {
                     const toAddress = extractEnvelopeAddress(recipient);
-                    let html: string | undefined;
-                    try {
-                        if (row.template_type === 'booking_created') {
-                        const frontendBase = (this.configService?.get<string>('FRONTEND_URL') ?? process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-                        const resMatch = row.message.match(/reservation request ([A-Z0-9\-]+)/i) || row.subject.match(/([A-Z0-9\-]{6,})/);
-                        const resNum = resMatch ? resMatch[1] : '';
-                        const resUrl = resNum ? `${frontendBase}/account/reservations/${resNum}` : `${frontendBase}/account/reservations`;
-                        const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-                        const nameMatch = row.message.match(/Dear ([^,\n]+)/);
-                        const customerName = nameMatch ? nameMatch[1] : 'Valued Client';
-                        const vehicleMatch = row.message.match(/for ([^\n\.]+)/i);
-                        const vehicleName = vehicleMatch ? vehicleMatch[1] : '';
-                        const pickupMatch = row.message.match(/Pickup Date: ([^\n]+)/i);
-                        const returnMatch = row.message.match(/Return Date: ([^\n]+)/i);
-                        const agencyMatch = row.message.match(/Agency: ([^\n]+)/i);
-                        const pickupAt = pickupMatch ? pickupMatch[1].trim() : '';
-                        const returnAt = returnMatch ? returnMatch[1].trim() : '';
-                        const agency = agencyMatch ? agencyMatch[1].trim() : 'Assigned LUXUAR Agency';
-                        
-                        const photoHtml = '';
-                        const vehicleLine = vehicleName ? `<p style="margin:0 0 18px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#1D1B18;"><strong>${esc(vehicleName)}</strong></p>` : '';
-                        
-                        html = renderLuxuarEmailHtml({
-                            title: 'Your journey begins here.',
-                            preheader: 'Reservation Received — Pending Approval',
-                            bodyHtml: `<p style="margin:0 0 18px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#B9975B;">RESERVATION RECEIVED</p>
-<p style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#1D1B18;">Dear ${esc(customerName)},</p>
-<p style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#1D1B18;">Thank you for choosing LUXUAR. We have received your reservation request${resNum ? ` <strong>${esc(resNum)}</strong>` : ''}${vehicleName ? ` for <strong>${esc(vehicleName)}</strong>` : ''}.</p>
-<p style="margin:0 0 24px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#1D1B18;">Your request is currently under review. Approval is required before payment, and you will receive a follow-up email once your reservation is approved or declined.</p>
-${photoHtml}
-${vehicleLine}
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#F9F6F1;border:1px solid #E6DFD3;margin:24px 0 28px 0;">
-  <tr><td style="padding:28px 28px 22px 28px;">
-    <p style="margin:0 0 18px 0;font-family:Georgia,'Times New Roman',Times,serif;font-size:18px;line-height:26px;color:#171512;">Reservation Summary</p>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-      <tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Reservation reference</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(resNum)}</td></tr>
-      ${pickupAt ? `<tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Pickup date</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(pickupAt)}</td></tr>` : ''}
-      ${returnAt ? `<tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Return date</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(returnAt)}</td></tr>` : ''}
-      <tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Collection agency</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(agency)}</td></tr>
-      <tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Current status</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#B9975B;">PENDING APPROVAL</td></tr>
-    </table>
-  </td></tr>
-</table>
-<p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#1D1B18;"><strong>Next steps</strong></p>
-<p style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#1D1B18;">Our team is reviewing your request. You will receive a follow-up email once your reservation is approved or declined.</p>`,
-                            bodyText: row.message,
-                            ctaLabel: 'VIEW MY RESERVATION',
-                            ctaUrl: resUrl,
-                        });
-                        } else {
-                            html = renderLuxuarEmailHtml({
-                                title: sanitizeHeaderValue(row.subject),
-                                preheader: sanitizeHeaderValue(row.subject),
-                                bodyHtml: row.message.replace(/\n/g, '<br/>'),
-                                bodyText: row.message,
+                    const rowSnapshot = this.getSmtpConfigSnapshot(toAddress);
+                    const transport =
+                        this.customTransport ?? this.createDefaultTransport(rowSnapshot);
+
+                    if (row.message === REDACTED_OUTBOX_MESSAGE) {
+                        throw new Error(
+                            'Sensitive outbox message content was already purged after delivery and cannot be resent',
+                        );
+                    }
+                    const plainText = this.decryptOutboxContent(row.message);
+                    if (plainText === REDACTED_OUTBOX_MESSAGE) {
+                        throw new Error(
+                            'Sensitive outbox message content was already purged after delivery and cannot be resent',
+                        );
+                    }
+                    let htmlToSend =
+                        row.html_message && row.html_message.trim()
+                            ? this.decryptOutboxContent(row.html_message)
+                            : null;
+                    if (!htmlToSend || !htmlToSend.trim()) {
+                        try {
+                            htmlToSend = renderLuxuarEmailHtml({
+                                kicker: 'LUXUAR NOTIFICATION',
+                                heading: sanitizeHeaderValue(row.subject),
+                                customerName: 'Valued Client',
+                                introMessage: plainText,
+                                signoff: 'Kind regards, The LUXUAR Team',
                             });
+                        } catch {
+                            htmlToSend = null;
                         }
-                    } catch {
-                        html = undefined;
                     }
                     await transport.sendMail({
                         outboxId: row.id,
                         to: toAddress,
-                        from: snapshot.from,
+                        from: rowSnapshot.from,
                         subject: sanitizeHeaderValue(row.subject),
-                        text: row.message,
-                        html,
+                        text: plainText,
+                        html: htmlToSend,
                         eventKey: row.event_key ?? null,
                         templateType: row.template_type ?? null,
                     });
@@ -525,11 +814,19 @@ ${vehicleLine}
                              recipient_email = COALESCE(recipient_email, $2),
                              sent_at = now(),
                              attempt_count = $3,
+                             message = CASE WHEN $4::boolean THEN $5::text ELSE message END,
+                             html_message = CASE WHEN $4::boolean THEN NULL ELSE html_message END,
                              last_error = NULL,
                              locked_at = NULL,
                              updated_at = now()
                          WHERE id = $1::uuid`,
-                        [row.id, toAddress, nextAttemptCount],
+                        [
+                            row.id,
+                            toAddress,
+                            nextAttemptCount,
+                            sensitiveRow,
+                            REDACTED_OUTBOX_MESSAGE,
+                        ],
                     );
 
                     if (row.notification_id) {
@@ -544,16 +841,50 @@ ${vehicleLine}
                     const sanitizedError = this.sanitizeError(error);
                     const exhausted = nextAttemptCount >= maxAttempts;
 
+                    // Protect legacy plaintext sensitive records at rest if they remain in 'pending' or 'failed' state
+                    let atRestMessage = row.message;
+                    let atRestHtml = row.html_message ?? null;
+                    if (
+                        sensitiveRow &&
+                        row.message !== REDACTED_OUTBOX_MESSAGE
+                    ) {
+                        try {
+                            if (!isEncryptedOutboxContent(row.message)) {
+                                atRestMessage = this.encryptOutboxContent(
+                                    row.message,
+                                );
+                            }
+                            if (
+                                row.html_message &&
+                                !isEncryptedOutboxContent(row.html_message)
+                            ) {
+                                atRestHtml = this.encryptOutboxContent(
+                                    row.html_message,
+                                );
+                            }
+                        } catch {
+                            // Keep existing row payload if encryption key is unavailable
+                        }
+                    }
+
                     if (exhausted) {
                         await this.db.query(
                             `UPDATE customer_email_outbox
                              SET status = 'failed',
                                  attempt_count = $2,
                                  last_error = $3,
+                                 message = COALESCE($4::text, message),
+                                 html_message = $5::text,
                                  locked_at = NULL,
                                  updated_at = now()
                              WHERE id = $1::uuid`,
-                            [row.id, nextAttemptCount, sanitizedError],
+                            [
+                                row.id,
+                                nextAttemptCount,
+                                sanitizedError,
+                                atRestMessage,
+                                atRestHtml,
+                            ],
                         );
                         failed += 1;
                     } else {
@@ -565,6 +896,8 @@ ${vehicleLine}
                                  attempt_count = $2,
                                  next_attempt_at = now() + ($3::bigint * interval '1 millisecond'),
                                  last_error = $4,
+                                 message = COALESCE($5::text, message),
+                                 html_message = $6::text,
                                  locked_at = NULL,
                                  updated_at = now()
                              WHERE id = $1::uuid`,
@@ -573,6 +906,8 @@ ${vehicleLine}
                                 nextAttemptCount,
                                 delayMs,
                                 sanitizedError,
+                                atRestMessage,
+                                atRestHtml,
                             ],
                         );
                         retried += 1;
@@ -626,17 +961,11 @@ ${vehicleLine}
         const pickupLocation =
             details?.pickupLocation || 'Assigned LUXUAR Agency';
         const returnLocation = details?.returnLocation || pickupLocation;
-        const pickupAtIso = details?.pickupAt
+        const pickupAt = details?.pickupAt
             ? new Date(details.pickupAt).toISOString()
-            : null;
-        const returnAtIso = details?.returnAt
-            ? new Date(details.returnAt).toISOString()
-            : null;
-        const pickupAt = pickupAtIso
-            ? new Date(pickupAtIso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
             : 'Scheduled pick-up';
-        const returnAt = returnAtIso
-            ? new Date(returnAtIso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+        const returnAt = details?.returnAt
+            ? new Date(details.returnAt).toISOString()
             : 'Scheduled return';
         const totalAmount = details?.totalAmount
             ? `EUR ${Number(details.totalAmount).toFixed(2)}`
@@ -650,11 +979,42 @@ ${vehicleLine}
         const rawDeposit = Number(details?.depositAmount || 0);
         const grandTotal = `EUR ${(rawRental + rawDeposit).toFixed(2)}`;
         const depositFormatted = `EUR ${rawDeposit.toFixed(2)}`;
-        const frontendBase = (this.configService?.get<string>('FRONTEND_URL') ?? process.env.FRONTEND_URL ?? 'http://localhost:3000').replace(/\/$/, '');
-        const paymentUrl = `${frontendBase}/account/payments/${reservationNumber}`;
-        const reservationUrl = `${frontendBase}/account/reservations/${reservationNumber}`;
+        const frontendBaseUrl = (
+            this.configService?.get<string>('FRONTEND_URL') ??
+            process.env.FRONTEND_URL ??
+            'http://localhost:3000'
+        ).replace(/\/$/, '');
+        const paymentUrl = `${frontendBaseUrl}/account/payments/${reservationNumber}`;
+        const vehiclesUrl = `${frontendBaseUrl}/vehicles`;
+        const reservationsUrl = `${frontendBaseUrl}/account/reservations`;
+        const vehiclePhotoUrl = this.resolveVehicleImageUrl(details?.vehiclePhoto);
 
         if (event === 'awaiting_payment') {
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RESERVATION UPDATE',
+                heading: 'Your reservation has been approved.',
+                customerName,
+                introMessage: `Your reservation request ${reservationNumber} has been approved by LUXUAR Concierge!`,
+                detailsTitle: 'RESERVATION SUMMARY',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    { label: 'Rental Dates', value: `${pickupAt} to ${returnAt}` },
+                    { label: 'Rental Price', value: totalAmount },
+                    { label: 'Security Deposit', value: depositFormatted },
+                    { label: 'Grand Total Payable', value: grandTotal },
+                    { label: 'Status', value: 'Awaiting Payment', isStatus: true },
+                ],
+                postMessage:
+                    'PAYMENT DEADLINE: You have exactly 24 hours to complete your secure payment. Once verified by Stripe, your reservation will immediately transition to CONFIRMED.',
+                ctaButton: {
+                    label: 'COMPLETE SECURE PAYMENT →',
+                    url: paymentUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
+
             await this.enqueueEmail({
                 customerId,
                 recipientEmail: details?.customerEmail ?? null,
@@ -681,10 +1041,37 @@ ${vehicleLine}
                     '',
                     'Once verified by Stripe, your reservation will immediately transition to CONFIRMED.',
                     '',
-                    'LUXUAR Concierge Team',
+                    'Kind regards, The LUXUAR Team',
                 ].join('\n'),
+                htmlMessage,
             });
         } else if (event === 'cancelled_unpaid') {
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RESERVATION UPDATE',
+                heading: 'Your reservation has been cancelled.',
+                customerName,
+                introMessage:
+                    'Your reservation has been cancelled because the payment deadline expired without a verified payment.',
+                detailsTitle: 'RESERVATION DETAILS',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    {
+                        label: 'Status',
+                        value: 'Cancelled — Unpaid',
+                        isStatus: true,
+                    },
+                ],
+                postMessage:
+                    'You are welcome to explore our collection and submit a new reservation request.',
+                ctaButton: {
+                    label: 'EXPLORE THE COLLECTION →',
+                    url: vehiclesUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
+
             await this.enqueueEmail({
                 customerId,
                 recipientEmail: details?.customerEmail ?? null,
@@ -695,15 +1082,45 @@ ${vehicleLine}
                 message: [
                     `Dear ${customerName},`,
                     '',
-                    `The 24-hour payment window for reservation ${reservationNumber} (${vehicleName}) has expired without verified payment.`,
-                    'In accordance with LUXUAR policy, the vehicle hold has been released and the reservation is now CANCELLED_UNPAID.',
+                    'Your reservation has been cancelled because the payment deadline expired without a verified payment.',
                     '',
-                    'You are welcome to select another vehicle or submit a new reservation request at any time at /vehicles.',
+                    'RESERVATION DETAILS',
+                    `• Vehicle: ${vehicleName}`,
+                    `• Reference: ${reservationNumber}`,
+                    '• Status: Cancelled — Unpaid',
                     '',
-                    'LUXUAR Concierge Team',
+                    'You are welcome to explore our collection and submit a new reservation request:',
+                    vehiclesUrl,
+                    '',
+                    'Kind regards, The LUXUAR Team',
                 ].join('\n'),
+                htmlMessage,
             });
         } else if (event === 'active_rental') {
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RENTAL UPDATE',
+                heading: 'Your rental is now active.',
+                customerName,
+                introMessage: `Your rental for ${vehicleName} (Reservation ${reservationNumber}) is now active.`,
+                detailsTitle: 'RENTAL DETAILS',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    {
+                        label: 'Scheduled Return',
+                        value: `${returnAt} at ${returnLocation}`,
+                    },
+                    { label: 'Status', value: 'Active Rental', isStatus: true },
+                ],
+                postMessage: 'Have an exceptional journey with LUXUAR.',
+                ctaButton: {
+                    label: 'VIEW RESERVATION DETAILS →',
+                    url: reservationsUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
+
             await this.enqueueEmail({
                 customerId,
                 recipientEmail: details?.customerEmail ?? null,
@@ -719,14 +1136,50 @@ ${vehicleLine}
                     '',
                     'Have an exceptional journey with LUXUAR.',
                     '',
-                    'LUXUAR Concierge Team',
+                    'Kind regards, The LUXUAR Team',
                 ].join('\n'),
+                htmlMessage,
             });
         } else if (event === 'completed') {
-            const refundedAmount = details?.depositRefundedAmount != null ? `EUR ${Number(details.depositRefundedAmount).toFixed(2)}` : 'EUR 0.00';
-            const retainedAmount = details?.depositRetainedAmount != null ? `EUR ${Number(details.depositRetainedAmount).toFixed(2)}` : 'EUR 0.00';
-            const reason = details?.depositRetentionReason?.trim() || (Number(details?.depositRetainedAmount || 0) > 0 ? 'Documented vehicle return damage' : 'No damage detected');
+            const refundedAmount =
+                details?.depositRefundedAmount != null
+                    ? `EUR ${Number(details.depositRefundedAmount).toFixed(2)}`
+                    : 'EUR 0.00';
+            const retainedAmount =
+                details?.depositRetainedAmount != null
+                    ? `EUR ${Number(details.depositRetainedAmount).toFixed(2)}`
+                    : 'EUR 0.00';
+            const reason =
+                details?.depositRetentionReason?.trim() ||
+                (Number(details?.depositRetainedAmount || 0) > 0
+                    ? 'Documented vehicle return damage'
+                    : 'No damage detected');
             const status = details?.depositRefundStatus || 'refunded';
+
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RENTAL COMPLETED',
+                heading: 'Rental Completed & Security Deposit Processed',
+                customerName,
+                introMessage: `The return of vehicle ${vehicleName} for reservation ${reservationNumber} has been finalized.`,
+                detailsTitle: 'SECURITY DEPOSIT STATEMENT',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    { label: 'Initial Deposit', value: depositFormatted },
+                    { label: 'Documented Deduction', value: retainedAmount },
+                    { label: 'Reason / Notes', value: reason },
+                    { label: 'Refunded Amount', value: refundedAmount },
+                    { label: 'Stripe Refund Status', value: status, isStatus: true },
+                ],
+                postMessage:
+                    'Thank you for traveling with LUXUAR. We look forward to welcoming you on your next journey.',
+                ctaButton: {
+                    label: 'VIEW RECEIPT & STATEMENT →',
+                    url: paymentUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
 
             await this.enqueueEmail({
                 customerId,
@@ -752,10 +1205,38 @@ ${vehicleLine}
                     '',
                     'Thank you for traveling with LUXUAR. We look forward to your next journey.',
                     '',
-                    'LUXUAR Concierge Team',
+                    'Kind regards, The LUXUAR Team',
                 ].join('\n'),
+                htmlMessage,
             });
         } else if (event === 'confirmed') {
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RESERVATION CONFIRMATION',
+                heading: 'Your reservation is confirmed.',
+                customerName,
+                introMessage: `Your payment for reservation ${reservationNumber} has been successfully verified via Stripe! We look forward to welcoming you.`,
+                detailsTitle: 'BOOKING DETAILS',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    { label: 'Pick-up Date', value: `${pickupAt} (${pickupLocation})` },
+                    { label: 'Return Date', value: `${returnAt} (${returnLocation})` },
+                    {
+                        label: 'Total Paid',
+                        value: `${grandTotal} (Rental: ${totalAmount} + Deposit: ${depositFormatted})`,
+                    },
+                    { label: 'Status', value: 'Confirmed — Paid', isStatus: true },
+                ],
+                postMessage:
+                    'Your receipt and booking voucher are available in your account.',
+                ctaButton: {
+                    label: 'VIEW RESERVATION DETAILS →',
+                    url: paymentUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
+
             await this.enqueueEmail({
                 customerId,
                 recipientEmail: details?.customerEmail ?? null,
@@ -782,8 +1263,34 @@ ${vehicleLine}
                     '',
                     'LUXUAR Concierge Team',
                 ].join('\n'),
+                htmlMessage,
             });
         } else if (event === 'cancelled') {
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RESERVATION UPDATE',
+                heading: 'Your reservation has been cancelled.',
+                customerName,
+                introMessage: `Your reservation ${reservationNumber} for ${vehicleName} has been cancelled.`,
+                detailsTitle: 'RESERVATION DETAILS',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    {
+                        label: 'Scheduled Pick-up',
+                        value: `${pickupAt} (${pickupLocation})`,
+                    },
+                    { label: 'Status', value: 'Cancelled', isStatus: true },
+                ],
+                postMessage:
+                    'You are welcome to explore our collection and submit a new reservation request.',
+                ctaButton: {
+                    label: 'EXPLORE THE COLLECTION →',
+                    url: vehiclesUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
+
             await this.enqueueEmail({
                 customerId,
                 recipientEmail: details?.customerEmail ?? null,
@@ -801,12 +1308,35 @@ ${vehicleLine}
                     '',
                     'LUXUAR Concierge Team',
                 ].join('\n'),
+                htmlMessage,
             });
         } else if (event === 'rejected') {
             const reason =
                 reservation.decisionReason?.trim() ||
                 details?.decisionReason?.trim() ||
                 'Vehicle scheduling conflict';
+
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RESERVATION UPDATE',
+                heading: 'Reservation Request Declined',
+                customerName,
+                introMessage: `Thank you for your interest in LUXUAR. Regrettably, your reservation request ${reservationNumber} for ${vehicleName} could not be approved at this time.\nReason: ${reason}.`,
+                detailsTitle: 'RESERVATION DETAILS',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    { label: 'Status', value: 'Declined', isStatus: true },
+                ],
+                postMessage:
+                    'No payment was collected, and any provisional hold on your vehicle has been released. We warmly invite you to select another vehicle from our fleet.',
+                ctaButton: {
+                    label: 'EXPLORE THE COLLECTION →',
+                    url: vehiclesUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
+
             await this.enqueueEmail({
                 customerId,
                 recipientEmail: details?.customerEmail ?? null,
@@ -822,56 +1352,51 @@ ${vehicleLine}
                     '',
                     'No payment was collected, and any provisional hold on your vehicle has been released.',
                     'We warmly invite you to select another vehicle from our fleet:',
-                    `${(this.configService?.get<string>('FRONTEND_URL') ?? 'http://localhost:3000').replace(/\/$/, '')}/vehicles`,
+                    `${vehiclesUrl}`,
                     '',
                     'LUXUAR Concierge Team',
                 ].join('\n'),
+                htmlMessage,
             });
         } else if (event === 'created') {
-            const vehicleImagePath = details?.vehicleImageUrl ?? null;
-            let vehicleImageUrl: string | null = null;
-            if (vehicleImagePath) {
-                if (vehicleImagePath.startsWith('http://') || vehicleImagePath.startsWith('https://')) {
-                    vehicleImageUrl = vehicleImagePath;
-                } else if (vehicleImagePath.startsWith('/')) {
-                    vehicleImageUrl = `${frontendBase}${vehicleImagePath}`;
-                } else {
-                    vehicleImageUrl = `${frontendBase}/vehicles/${vehicleImagePath.replace(/^.*[\\/]/, '')}`;
-                }
-            }
+            const pickupFormatted = details?.pickupAt
+                ? new Date(details.pickupAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                  })
+                : pickupAt;
+            const returnFormatted = details?.returnAt
+                ? new Date(details.returnAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                  })
+                : returnAt;
 
-            const photoHtml = vehicleImageUrl
-                ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin:28px 0 24px 0;"><tr><td align="center" style="background-color:#F7F4EF;"><img src="${vehicleImageUrl.replace(/"/g, '&quot;')}" alt="Selected vehicle: ${String(vehicleName).replace(/"/g, '&quot;')}" width="520" style="display:block;width:100%;max-width:520px;height:auto;border:0;max-height:260px;object-fit:cover;" /></td></tr></table>`
-                : '';
-
-            const esc = (s: string) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-            const summaryCardHtml = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#F9F6F1;border:1px solid #E6DFD3;margin:24px 0;"><tr><td style="padding:28px 28px 20px 28px;"><p style="margin:0 0 18px 0;font-family:\'Times New Roman\',Times,serif;font-size:18px;line-height:26px;color:#171512;">Reservation Summary</p><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Vehicle</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(vehicleName)}</td></tr><tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Reference</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(reservationNumber)}</td></tr><tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Pickup Date</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(pickupAt)}</td></tr><tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Return Date</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(returnAt)}</td></tr><tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Status</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#B08B52;">Pending Approval</td></tr><tr><td style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;color:#8B8472;">Agency</td><td align="right" style="padding:10px 0;border-top:1px solid #E6DFD3;font-family:Arial,Helvetica,sans-serif;font-size:15px;color:#171512;">${esc(pickupLocation || 'Assigned LUXUAR Agency')}</td></tr></table></td></tr></table>`;
-
-            const bodyHtml = `<p style="margin:0 0 18px 0;font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:0.18em;text-transform:uppercase;color:#B08B52;">RESERVATION RECEIVED</p><h1 style="margin:0 0 18px 0;font-family:\'Times New Roman\',Times,serif;font-size:32px;line-height:40px;font-weight:400;color:#171512;letter-spacing:0.01em;">Your journey begins here.</h1><p style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:26px;color:#171512;">Dear ${esc(customerName)},</p><p style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:26px;color:#171512;">Thank you for choosing LUXUAR. We have received your reservation request <strong>${esc(reservationNumber)}</strong> for <strong>${esc(vehicleName)}</strong>.</p><p style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:26px;color:#171512;">Your request is currently under review. Approval is required before payment, and you will receive a follow-up email once your reservation is approved or declined.</p>${photoHtml}${summaryCardHtml}<p style="margin:0 0 12px 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:26px;color:#171512;"><strong>Next step</strong></p><p style="margin:0 0 16px 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:26px;color:#171512;">Our team is reviewing your request. You will receive a follow-up email once your reservation is approved or declined.</p>`;
-
-            const bodyText = [
-                `RESERVATION RECEIVED`,
-                ``,
-                `Your journey begins here.`,
-                ``,
-                `Dear ${customerName},`,
-                ``,
-                `Thank you for choosing LUXUAR. We have received your reservation request ${reservationNumber} for ${vehicleName}.`,
-                ``,
-                `Your request is currently under review. Approval is required before payment, and you will receive a follow-up email once your reservation is approved or declined.`,
-                ``,
-                `RESERVATION SUMMARY`,
-                `- Vehicle: ${vehicleName}`,
-                `- Reference: ${reservationNumber}`,
-                `- Pickup Date: ${pickupAt}`,
-                `- Return Date: ${returnAt}`,
-                `- Status: Pending Approval`,
-                `- Agency: ${pickupLocation || 'Assigned LUXUAR Agency'}`,
-                ``,
-                `Next step: Our team is reviewing your request. You will receive a follow-up email once your reservation is approved or declined.`,
-                ``,
-                `View your reservation: ${reservationUrl}`,
-            ].join('\n');
+            const htmlMessage = renderLuxuarEmailHtml({
+                kicker: 'RESERVATION RECEIVED',
+                heading: 'Your reservation request has been received.',
+                customerName,
+                introMessage: `Thank you for choosing LUXUAR. We have received your reservation request ${reservationNumber} for ${vehicleName}.`,
+                detailsTitle: 'RESERVATION DETAILS',
+                vehicleName,
+                vehiclePhotoUrl,
+                rows: [
+                    { label: 'Reference', value: reservationNumber },
+                    { label: 'Pickup Date', value: pickupFormatted },
+                    { label: 'Return Date', value: returnFormatted },
+                    { label: 'Collection Agency', value: pickupLocation },
+                    { label: 'Status', value: 'Pending Approval', isStatus: true },
+                ],
+                postMessage:
+                    'Our administration team is currently reviewing your request. You will receive an email as soon as your booking is approved, with a secure link to complete payment.',
+                ctaButton: {
+                    label: 'VIEW YOUR RESERVATIONS →',
+                    url: reservationsUrl,
+                },
+                signoff: 'Kind regards, The LUXUAR Team',
+            });
 
             await this.enqueueEmail({
                 customerId,
@@ -880,7 +1405,25 @@ ${vehicleLine}
                 templateType: 'booking_created',
                 notificationId,
                 subject: `Reservation Received — Pending Approval`,
-                message: bodyText,
+                message: [
+                    `Dear ${customerName},`,
+                    '',
+                    `Thank you for choosing LUXUAR. We have received your reservation request ${reservationNumber} for ${vehicleName}.`,
+                    '',
+                    'RESERVATION DETAILS',
+                    `• Vehicle: ${vehicleName}`,
+                    `• Reference: ${reservationNumber}`,
+                    `• Pickup Date: ${pickupFormatted}`,
+                    `• Return Date: ${returnFormatted}`,
+                    `• Collection Agency: ${pickupLocation}`,
+                    '• Status: Pending Approval',
+                    '',
+                    'Our administration team is currently reviewing your request.',
+                    'You will receive an email as soon as your booking is approved, with a secure link to complete payment.',
+                    '',
+                    'Kind regards, The LUXUAR Team',
+                ].join('\n'),
+                htmlMessage,
             });
         }
 
@@ -920,6 +1463,27 @@ ${vehicleLine}
             `reservation:${reservationId}:no_show:customer`,
         );
 
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'RESERVATION UPDATE',
+            heading: 'Reservation Cancelled (No-Show)',
+            customerName,
+            introMessage: `Reservation ${reservationNumber} for ${vehicleName} was marked as a no-show because check-in was not completed before the pick-up deadline.`,
+            detailsTitle: 'RESERVATION DETAILS',
+            vehicleName,
+            vehiclePhotoUrl: this.resolveVehicleImageUrl(details?.vehiclePhoto),
+            rows: [
+                { label: 'Reference', value: reservationNumber },
+                { label: 'Status', value: 'Cancelled — No-Show', isStatus: true },
+            ],
+            postMessage:
+                'The reserved vehicle has been released back into fleet availability. You are welcome to explore our collection and submit a new reservation request.',
+            ctaButton: {
+                label: 'EXPLORE THE COLLECTION →',
+                url: `${(this.configService?.get<string>('FRONTEND_URL') ?? 'http://localhost:3000').replace(/\/$/, '')}/vehicles`,
+            },
+            signoff: 'Kind regards, The LUXUAR Team',
+        });
+
         await this.enqueueEmail({
             customerId,
             recipientEmail: details?.customerEmail ?? null,
@@ -935,6 +1499,7 @@ ${vehicleLine}
                 '',
                 'LUXUAR Concierge',
             ].join('\n'),
+            htmlMessage,
         });
 
         await this.processOutboxBatch();
@@ -983,6 +1548,25 @@ ${vehicleLine}
             .digest('hex')
             .slice(0, 16);
 
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'CHECK-IN DETAILS',
+            heading: 'Your Check-In Code',
+            customerName,
+            introMessage: `Your one-time check-in code for reservation ${normalizedNumber} (${vehicleName}) is ready.`,
+            detailsTitle: 'CHECK-IN DETAILS',
+            vehicleName,
+            vehiclePhotoUrl: this.resolveVehicleImageUrl(details?.vehiclePhoto),
+            rows: [
+                { label: 'Reference', value: normalizedNumber },
+                { label: 'Check-In Code', value: input.code, isStatus: true },
+                { label: 'Pick-Up Agency', value: pickupLocation },
+                { label: 'Code Valid Until', value: expiresIso },
+            ],
+            postMessage:
+                'Present this code along with your driving licence and identity document at the agency desk.',
+            signoff: 'Kind regards, The LUXUAR Team',
+        });
+
         await this.enqueueEmail({
             customerId: input.customerId,
             recipientEmail: details?.customerEmail ?? null,
@@ -1000,6 +1584,7 @@ ${vehicleLine}
                 '',
                 'LUXUAR Concierge',
             ].join('\n'),
+            htmlMessage,
         });
 
         await this.processOutboxBatch();
@@ -1043,6 +1628,39 @@ ${vehicleLine}
             entityId: rental.rentalId,
         });
 
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'RENTAL ACTIVE',
+            heading: 'Check-In Completed — Rental Active',
+            customerName: rental.customerName,
+            introMessage: `Your vehicle check-in and handover for reservation ${rental.reservationNumber} is complete.`,
+            detailsTitle: 'HANDOVER DETAILS',
+            vehicleName: rental.vehicleName,
+            vehiclePhotoUrl: this.resolveVehicleImageUrl(rental.vehiclePhoto),
+            rows: [
+                { label: 'Rental Contract', value: rental.contractNumber },
+                { label: 'Pick-Up Agency', value: rental.pickupAgencyName },
+                { label: 'Handover Time', value: rental.startedAtIso },
+                {
+                    label: 'Expected Return',
+                    value: `${rental.expectedReturnAtIso} at ${rental.returnAgencyName}`,
+                },
+                {
+                    label: 'Recorded Mileage',
+                    value: `${rental.pickupMileageKm ?? 'N/A'} km`,
+                },
+                {
+                    label: 'Fuel Level',
+                    value: `${rental.pickupFuelPct ?? 'N/A'}%`,
+                },
+            ],
+            postMessage: 'Wishing you an exceptional journey with LUXUAR.',
+            ctaButton: {
+                label: 'VIEW RESERVATION DETAILS →',
+                url: `${(this.configService?.get<string>('FRONTEND_URL') ?? 'http://localhost:3000').replace(/\/$/, '')}/account/reservations`,
+            },
+            signoff: 'Kind regards, The LUXUAR Team',
+        });
+
         await this.enqueueEmail({
             customerId: rental.customerId,
             recipientEmail: rental.customerEmail,
@@ -1065,6 +1683,7 @@ ${vehicleLine}
                 '',
                 'LUXUAR Concierge',
             ].join('\n'),
+            htmlMessage,
         });
 
         await this.processOutboxBatch();
@@ -1118,6 +1737,44 @@ ${vehicleLine}
             entityId: rental.rentalId,
         });
 
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'RETURN CONFIRMATION',
+            heading: 'Vehicle Return Registered',
+            customerName: rental.customerName,
+            introMessage: `We confirm the return of your ${rental.vehicleName} for reservation ${rental.reservationNumber}.`,
+            detailsTitle: 'RETURN INSPECTION DETAILS',
+            vehicleName: rental.vehicleName,
+            vehiclePhotoUrl: this.resolveVehicleImageUrl(rental.vehiclePhoto),
+            rows: [
+                { label: 'Rental Contract', value: rental.contractNumber },
+                { label: 'Return Reference', value: returnRef },
+                { label: 'Return Agency', value: rental.returnAgencyName },
+                {
+                    label: 'Returned At',
+                    value: rental.returnedAtIso ?? new Date().toISOString(),
+                },
+                {
+                    label: 'Return Mileage',
+                    value: `${rental.returnMileageKm ?? 'N/A'} km`,
+                },
+                {
+                    label: 'Return Fuel Level',
+                    value: `${rental.returnFuelPct ?? 'N/A'}%`,
+                },
+                {
+                    label: 'Automatic Return Fees',
+                    value: `EUR ${autoCharges}`,
+                },
+                {
+                    label: 'Damage Assessment',
+                    value: `EUR ${damageEst}`,
+                },
+            ],
+            postMessage:
+                'Thank you for choosing LUXUAR. We look forward to welcoming you on your next journey.',
+            signoff: 'Kind regards, The LUXUAR Team',
+        });
+
         await this.enqueueEmail({
             customerId: rental.customerId,
             recipientEmail: rental.customerEmail,
@@ -1141,6 +1798,7 @@ ${vehicleLine}
                 '',
                 'LUXUAR Concierge',
             ].join('\n'),
+            htmlMessage,
         });
 
         await this.processOutboxBatch();
@@ -1187,6 +1845,31 @@ ${vehicleLine}
             entityId: rental.rentalId,
         });
 
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'RENTAL CLOSED',
+            heading: 'Rental Contract Closed',
+            customerName: rental.customerName,
+            introMessage: `Your rental contract ${rental.contractNumber} (reservation ${rental.reservationNumber}, ${rental.vehicleName}) has been finalized and closed.`,
+            detailsTitle: 'RENTAL SUMMARY',
+            vehicleName: rental.vehicleName,
+            vehiclePhotoUrl: this.resolveVehicleImageUrl(rental.vehiclePhoto),
+            rows: [
+                { label: 'Rental Contract', value: rental.contractNumber },
+                {
+                    label: 'Reservation Reference',
+                    value: rental.reservationNumber,
+                },
+                { label: 'Status', value: 'Closed', isStatus: true },
+            ],
+            postMessage:
+                'All invoice balances and security deposit settlements have been completed. We look forward to welcoming you again.',
+            ctaButton: {
+                label: 'EXPLORE FLEET →',
+                url: `${(this.configService?.get<string>('FRONTEND_URL') ?? 'http://localhost:3000').replace(/\/$/, '')}/vehicles`,
+            },
+            signoff: 'Kind regards, The LUXUAR Team',
+        });
+
         await this.enqueueEmail({
             customerId: rental.customerId,
             recipientEmail: rental.customerEmail,
@@ -1204,6 +1887,7 @@ ${vehicleLine}
                 '',
                 'LUXUAR Concierge',
             ].join('\n'),
+            htmlMessage,
         });
 
         await this.processOutboxBatch();
@@ -1215,6 +1899,125 @@ ${vehicleLine}
         } catch (error) {
             this.logger.warn(
                 `Rental closed email could not be queued for rental ${rentalId}: ${this.sanitizeError(error)}`,
+            );
+        }
+    }
+
+    /**
+     * Enqueues and dispatches a branded invoice notification when a final invoice is issued.
+     */
+    async notifyInvoiceIssued(
+        rentalId: string,
+        invoiceNumber: string,
+        totalAmountEur: string,
+    ): Promise<void> {
+        await this.ensureSchema();
+        const rental = await this.loadRentalDetails(rentalId);
+        if (!rental) return;
+
+        const frontendBaseUrl = (
+            this.configService?.get<string>('FRONTEND_URL') ??
+            process.env.FRONTEND_URL ??
+            'http://localhost:3000'
+        ).replace(/\/$/, '');
+        const rentalsUrl = `${frontendBaseUrl}/account/rentals`;
+
+        const notificationEventKey = `invoice:${invoiceNumber}:issued:customer`;
+        const notificationId = await this.ensureCustomerNotification({
+            recipientId: rental.customerId,
+            category: 'payments',
+            priority: 'info',
+            title: `Final invoice ${invoiceNumber} issued`,
+            message: `Your final invoice ${invoiceNumber} for rental ${rental.contractNumber} (${rental.vehicleName}) has been issued. Total: EUR ${totalAmountEur}.`,
+            actionUrl: '/account/rentals',
+            eventKey: notificationEventKey,
+            entityType: 'rental',
+            entityId: rental.rentalId,
+        });
+
+        const rows = [
+            { label: 'Invoice Number', value: invoiceNumber },
+            { label: 'Rental Contract', value: rental.contractNumber },
+            { label: 'Reservation Reference', value: rental.reservationNumber },
+            {
+                label: 'Total Invoiced Amount',
+                value: `EUR ${Number(totalAmountEur).toFixed(2)}`,
+            },
+            { label: 'Status', value: 'Issued', isStatus: true },
+        ];
+
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'FINANCIAL STATEMENT',
+            heading: 'Final Invoice Issued',
+            customerName: rental.customerName,
+            introMessage: `Your final invoice for rental contract ${rental.contractNumber} (${rental.vehicleName}) has been finalized and issued by LUXUAR Accounting.`,
+            detailsTitle: 'INVOICE SUMMARY',
+            vehicleName: rental.vehicleName,
+            vehiclePhotoUrl: this.resolveVehicleImageUrl(rental.vehiclePhoto),
+            rows,
+            postMessage:
+                'You can view and download your official PDF invoice directly from your LUXUAR account portal at any time.',
+            ctaButton: {
+                label: 'VIEW MY RENTALS & INVOICES →',
+                url: rentalsUrl,
+            },
+            signoff: 'Kind regards, The LUXUAR Finance Team',
+        });
+
+        const plainText = renderLuxuarEmailText({
+            kicker: 'FINANCIAL STATEMENT',
+            heading: 'Final Invoice Issued',
+            customerName: rental.customerName,
+            introMessage: `Your final invoice for rental contract ${rental.contractNumber} (${rental.vehicleName}) has been finalized and issued by LUXUAR Accounting.`,
+            detailsTitle: 'INVOICE SUMMARY',
+            vehicleName: rental.vehicleName,
+            rows: [
+                { label: 'Invoice Number', value: invoiceNumber },
+                { label: 'Rental Contract', value: rental.contractNumber },
+                { label: 'Reservation Reference', value: rental.reservationNumber },
+                {
+                    label: 'Total Invoiced Amount',
+                    value: `EUR ${Number(totalAmountEur).toFixed(2)}`,
+                },
+                { label: 'Status', value: 'Issued' },
+            ],
+            postMessage:
+                'You can view and download your official PDF invoice directly from your LUXUAR account portal at any time.',
+            ctaButton: {
+                label: 'VIEW MY RENTALS & INVOICES',
+                url: rentalsUrl,
+            },
+            signoff: 'Kind regards, The LUXUAR Finance Team',
+        });
+
+        await this.enqueueEmail({
+            customerId: rental.customerId,
+            recipientEmail: rental.customerEmail,
+            eventKey: `invoice:${invoiceNumber}:issued`,
+            templateType: 'invoice_issued',
+            notificationId,
+            subject: `Final Invoice ${invoiceNumber} — LUXUAR Rental Contract ${rental.contractNumber}`,
+            message: plainText,
+            htmlMessage,
+        });
+
+        await this.processOutboxBatch();
+    }
+
+    async safelyNotifyInvoiceIssued(
+        rentalId: string,
+        invoiceNumber: string,
+        totalAmountEur: string,
+    ): Promise<void> {
+        try {
+            await this.notifyInvoiceIssued(
+                rentalId,
+                invoiceNumber,
+                totalAmountEur,
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Invoice email could not be queued for rental ${rentalId}: ${this.sanitizeError(error)}`,
             );
         }
     }
@@ -1243,6 +2046,27 @@ ${vehicleLine}
         });
         const verifyUrl = `${frontendBaseUrl}/verify-email?${queryParams.toString()}`;
 
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'SECURITY & VERIFICATION',
+            heading: 'Verify Your Email Address',
+            customerName,
+            introMessage:
+                'Thank you for registering with LUXUAR. Please click the button below to verify your email address and activate your bespoke car rental access.',
+            detailsTitle: 'SECURITY DETAILS',
+            rows: [
+                { label: 'Registered Email', value: input.recipientEmail || 'Registered Client' },
+                { label: 'Security Link', value: 'Single-use secure verification', isStatus: true },
+                { label: 'Validity Period', value: '5 minutes from issuance' },
+            ],
+            postMessage:
+                'If you did not request this account registration, please disregard this email. Your email address will not be activated without verification.',
+            ctaButton: {
+                label: 'VERIFY EMAIL',
+                url: verifyUrl,
+            },
+            signoff: 'Kind regards, The LUXUAR Team',
+        });
+
         await this.enqueueEmail({
             customerId: input.customerId,
             recipientEmail: input.recipientEmail ?? null,
@@ -1252,17 +2076,17 @@ ${vehicleLine}
             message: [
                 `Dear ${customerName},`,
                 '',
-                'Please verify your email address for your LUXUAR account by clicking the link below:',
+                'Thank you for registering with LUXUAR.',
+                'Please verify your email address to activate your account by clicking the secure link below:',
+                '',
                 verifyUrl,
                 '',
-                'Or manually paste your one-time verification token:',
-                `Verification token: ${input.token}`,
-                `Valid until: ${expiresIso}`,
-                '',
+                'This single-use link is valid for 5 minutes.',
                 'If you did not create a LUXUAR account, you can safely ignore this message.',
                 '',
                 'LUXUAR Concierge',
             ].join('\n'),
+            htmlMessage,
         });
 
         await this.processOutboxBatch();
@@ -1299,6 +2123,35 @@ ${vehicleLine}
         await this.ensureSchema();
         const expiresIso = new Date(input.expiresAt).toISOString();
         const customerName = input.customerName?.trim() || 'Valued Client';
+        const frontendBaseUrl =
+            process.env.FRONTEND_URL ||
+            process.env.APP_URL ||
+            'http://localhost:3000';
+        const queryParams = new URLSearchParams({
+            token: input.token,
+            ...(input.recipientEmail ? { email: input.recipientEmail } : {}),
+        });
+        const resetUrl = `${frontendBaseUrl}/reset-password?${queryParams.toString()}`;
+
+        const htmlMessage = renderLuxuarEmailHtml({
+            kicker: 'ACCOUNT SECURITY',
+            heading: 'Password Reset Request',
+            customerName,
+            introMessage:
+                'We received a request to reset the password for your LUXUAR account.',
+            detailsTitle: 'RESET CREDENTIALS',
+            rows: [
+                { label: 'One-Time Token', value: input.token, isStatus: true },
+                { label: 'Valid Until', value: expiresIso },
+            ],
+            postMessage:
+                'If you did not request a password reset, no action is needed and your password will remain unchanged.',
+            ctaButton: {
+                label: 'RESET YOUR PASSWORD →',
+                url: resetUrl,
+            },
+            signoff: 'Kind regards, The LUXUAR Team',
+        });
 
         await this.enqueueEmail({
             customerId: input.customerId,
@@ -1310,6 +2163,10 @@ ${vehicleLine}
                 `Dear ${customerName},`,
                 '',
                 'We received a request to reset the password for your LUXUAR account.',
+                'To reset your password, please click the link below:',
+                resetUrl,
+                '',
+                'Or manually enter your one-time reset token on the reset page:',
                 `One-time reset token: ${input.token}`,
                 `Valid until: ${expiresIso}`,
                 '',
@@ -1317,6 +2174,7 @@ ${vehicleLine}
                 '',
                 'LUXUAR Concierge',
             ].join('\n'),
+            htmlMessage,
         });
 
         await this.processOutboxBatch();
@@ -1357,7 +2215,7 @@ ${vehicleLine}
         decisionReason: string | null;
         pickupLocation: string | null;
         returnLocation: string | null;
-        vehicleImageUrl?: string | null;
+        vehiclePhoto?: string | null;
     } | null> {
         const rows = await this.db.query(
             `SELECT r.id AS "reservationId",
@@ -1377,12 +2235,18 @@ ${vehicleLine}
                     r.decision_reason AS "decisionReason",
                     COALESCE(pl.name, vl.name) AS "pickupLocation",
                     COALESCE(rl.name, pl.name, vl.name) AS "returnLocation",
-                    (SELECT vi.storage_path FROM vehicle_images vi WHERE vi.vehicle_id = v.id ORDER BY vi.is_primary DESC, vi.created_at ASC LIMIT 1) AS "vehicleImageUrl"
+                    img.storage_path AS "vehiclePhoto"
              FROM reservations r
              LEFT JOIN users u ON u.id = r.customer_id
              LEFT JOIN vehicles v ON v.id = r.vehicle_id
              LEFT JOIN vehicle_models m ON m.id = v.model_id
              LEFT JOIN brands b ON b.id = m.brand_id
+             LEFT JOIN LATERAL (
+                 SELECT storage_path FROM vehicle_images
+                 WHERE vehicle_id = v.id
+                 ORDER BY is_primary DESC, sort_order ASC
+                 LIMIT 1
+             ) img ON true
              LEFT JOIN reservation_preferences p ON p.reservation_id = r.id
              LEFT JOIN rental_locations pl ON pl.id = p.pickup_location_id
              LEFT JOIN rental_locations rl ON rl.id = p.dropoff_location_id
@@ -1409,7 +2273,7 @@ ${vehicleLine}
         decisionReason: string | null;
         pickupLocation: string | null;
         returnLocation: string | null;
-        vehicleImageUrl?: string | null;
+        vehiclePhoto?: string | null;
     } | null> {
         const rows = await this.db.query(
             `SELECT r.id AS "reservationId",
@@ -1424,12 +2288,18 @@ ${vehicleLine}
                     r.decision_reason AS "decisionReason",
                     COALESCE(pl.name, vl.name) AS "pickupLocation",
                     COALESCE(rl.name, pl.name, vl.name) AS "returnLocation",
-                    (SELECT vi.storage_path FROM vehicle_images vi WHERE vi.vehicle_id = v.id ORDER BY vi.is_primary DESC, vi.created_at ASC LIMIT 1) AS "vehicleImageUrl"
+                    img.storage_path AS "vehiclePhoto"
              FROM reservations r
              LEFT JOIN users u ON u.id = r.customer_id
              LEFT JOIN vehicles v ON v.id = r.vehicle_id
              LEFT JOIN vehicle_models m ON m.id = v.model_id
              LEFT JOIN brands b ON b.id = m.brand_id
+             LEFT JOIN LATERAL (
+                 SELECT storage_path FROM vehicle_images
+                 WHERE vehicle_id = v.id
+                 ORDER BY is_primary DESC, sort_order ASC
+                 LIMIT 1
+             ) img ON true
              LEFT JOIN reservation_preferences p ON p.reservation_id = r.id
              LEFT JOIN rental_locations pl ON pl.id = p.pickup_location_id
              LEFT JOIN rental_locations rl ON rl.id = p.dropoff_location_id
@@ -1460,6 +2330,7 @@ ${vehicleLine}
         returnMileageKm: number | null;
         returnFuelPct: number | null;
         returnReference: string | null;
+        vehiclePhoto?: string | null;
     } | null> {
         const rows = await this.db.query(
             `SELECT l.id AS "rentalId",
@@ -1479,13 +2350,20 @@ ${vehicleLine}
                     pi.fuel_level_pct AS "pickupFuelPct",
                     COALESCE(ri.mileage_km, ret_i.mileage_km) AS "returnMileageKm",
                     COALESCE(ri.fuel_level_pct, ret_i.fuel_level_pct) AS "returnFuelPct",
-                    vr.reference AS "returnReference"
+                    vr.reference AS "returnReference",
+                    img.storage_path AS "vehiclePhoto"
              FROM rentals l
              JOIN reservations r ON r.id = l.reservation_id
              LEFT JOIN users u ON u.id = r.customer_id
              LEFT JOIN vehicles v ON v.id = r.vehicle_id
              LEFT JOIN vehicle_models m ON m.id = v.model_id
              LEFT JOIN brands b ON b.id = m.brand_id
+             LEFT JOIN LATERAL (
+                 SELECT storage_path FROM vehicle_images
+                 WHERE vehicle_id = v.id
+                 ORDER BY is_primary DESC, sort_order ASC
+                 LIMIT 1
+             ) img ON true
              LEFT JOIN reservation_preferences p ON p.reservation_id = r.id
              LEFT JOIN rental_locations pl ON pl.id = p.pickup_location_id
              LEFT JOIN rental_locations rl ON rl.id = p.dropoff_location_id
@@ -1528,7 +2406,102 @@ ${vehicleLine}
             returnMileageKm: row.returnMileageKm ?? null,
             returnFuelPct: row.returnFuelPct ?? null,
             returnReference: row.returnReference ?? null,
+            vehiclePhoto: row.vehiclePhoto ?? null,
         };
+    }
+
+    private resolveVehicleImageUrl(storagePath?: string | null): string | null {
+        if (!storagePath || typeof storagePath !== 'string') return null;
+        const trimmed = storagePath.trim();
+        if (!trimmed) return null;
+        if (/^https?:\/\//i.test(trimmed)) {
+            return trimmed;
+        }
+        const frontendBaseUrl = (
+            this.configService?.get<string>('FRONTEND_URL') ??
+            process.env.FRONTEND_URL ??
+            'http://localhost:3000'
+        ).replace(/\/$/, '');
+        const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+        return `${frontendBaseUrl}${cleanPath}`;
+    }
+
+    private extractLocalInlineAttachments(html?: string | null): {
+        html: string | null;
+        attachments: EmailInlineAttachment[];
+    } {
+        if (!html || !html.trim()) {
+            return { html: null, attachments: [] };
+        }
+        let processedHtml = html;
+        const attachments: EmailInlineAttachment[] = [];
+
+        const imgRegex = /src="((?:https?:\/\/[^"]+)?\/vehicles\/([a-zA-Z0-9._-]+))"/g;
+        let match: RegExpExecArray | null;
+        let idx = 0;
+
+        while ((match = imgRegex.exec(html)) !== null) {
+            const fullUrl = match[1];
+            const filename = path.basename(match[2]);
+            if (!filename || filename.includes('..')) continue;
+
+            const candidatePaths = [
+                path.resolve(process.cwd(), '../frontend/public/vehicles', filename),
+                path.resolve(process.cwd(), 'frontend/public/vehicles', filename),
+            ];
+            if (process.env.VEHICLE_IMAGES_DIR) {
+                candidatePaths.unshift(
+                    path.resolve(process.env.VEHICLE_IMAGES_DIR, filename),
+                );
+            }
+
+            let foundPath: string | null = null;
+            for (const candidate of candidatePaths) {
+                try {
+                    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+                        foundPath = candidate;
+                        break;
+                    }
+                } catch {
+                    // ignore file access error
+                }
+            }
+
+            if (!foundPath) continue;
+
+            try {
+                const fileBuf = fs.readFileSync(foundPath);
+                const ext = path.extname(filename).toLowerCase();
+                const contentType =
+                    ext === '.jpg' || ext === '.jpeg'
+                        ? 'image/jpeg'
+                        : ext === '.webp'
+                          ? 'image/webp'
+                          : 'image/png';
+                idx += 1;
+                const cid =
+                    idx === 1
+                        ? 'vehicle-photo@luxuar.hu'
+                        : `vehicle-photo-${idx}@luxuar.hu`;
+                const rawB64 = fileBuf.toString('base64');
+                const wrappedB64 = rawB64.replace(/(.{76})/g, '$1\r\n');
+
+                attachments.push({
+                    cid,
+                    filename,
+                    contentType,
+                    contentBase64: wrappedB64,
+                });
+
+                processedHtml = processedHtml
+                    .split(`src="${fullUrl}"`)
+                    .join(`src="cid:${cid}"`);
+            } catch {
+                // Fallback to original URL if file read fails
+            }
+        }
+
+        return { html: processedHtml, attachments };
     }
 
     private async findNotificationId(
@@ -1546,7 +2519,7 @@ ${vehicleLine}
 
     private async ensureCustomerNotification(input: {
         recipientId: string;
-        category: 'reservations' | 'rentals';
+        category: 'reservations' | 'rentals' | 'payments' | 'security' | 'fleet' | 'general';
         priority: 'info' | 'success' | 'warning';
         title: string;
         message: string;
@@ -1619,8 +2592,12 @@ ${vehicleLine}
         const port = snapshot.port;
         const secure = snapshot.secure;
         const timeoutMs = snapshot.timeoutMs;
-        const user = this.getEnvString('SMTP_USER');
-        const password = this.getEnvString('SMTP_PASSWORD');
+        const user = snapshot.authEnabled
+            ? this.getEnvString('SMTP_USER')
+            : undefined;
+        const password = snapshot.authEnabled
+            ? this.getEnvString('SMTP_PASSWORD')
+            : undefined;
 
         return {
             sendMail: async (payload: EmailMessagePayload) => {
@@ -1788,36 +2765,83 @@ ${vehicleLine}
             await sendCommand(`RCPT TO:<${toEnvelope}>`, [250, 251]);
             await sendCommand('DATA', [354]);
 
-            const textBody = dotStuffBody(payload.text);
-            if (payload.html) {
-                const boundary = `_luxuar_${payload.outboxId}_alt`;
-                const mh = [
-                    `From: ${sanitizeHeaderValue(payload.from)}`,
-                    `To: <${toEnvelope}>`,
-                    `Subject: ${sanitizeHeaderValue(payload.subject)}`,
-                    `Message-ID: ${messageId}`,
-                    `Date: ${new Date().toUTCString()}`,
-                    'MIME-Version: 1.0',
-                    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+            let dataPayload: string;
+            if (payload.html && payload.html.trim().length > 0) {
+                const inlineResolved = this.extractLocalInlineAttachments(
+                    payload.html,
+                );
+                const finalHtml = inlineResolved.html ?? payload.html;
+                const allAttachments = [
+                    ...(payload.inlineAttachments ?? []),
+                    ...inlineResolved.attachments,
                 ];
-                const htmlBody = dotStuffBody(payload.html.replace(/\r?\n/g, '\r\n'));
-                const dataPayload = [
-                    mh.join('\r\n'),
-                    '',
-                    `--${boundary}`,
-                    'Content-Type: text/plain; charset=utf-8',
-                    'Content-Transfer-Encoding: 8bit',
-                    '',
-                    textBody,
-                    `--${boundary}`,
-                    'Content-Type: text/html; charset=utf-8',
-                    'Content-Transfer-Encoding: 8bit',
-                    '',
-                    htmlBody,
-                    `--${boundary}--`,
-                    '.',
-                ].join('\r\n');
-                await sendCommand(dataPayload, [250]);
+                const altBoundary = `----=_Part_Alt_${randomUUID().replace(/-/g, '')}`;
+
+                if (allAttachments.length > 0) {
+                    const relBoundary = `----=_Part_Rel_${randomUUID().replace(/-/g, '')}`;
+                    const headers = [
+                        `From: ${sanitizeHeaderValue(payload.from)}`,
+                        `To: <${toEnvelope}>`,
+                        `Subject: ${sanitizeHeaderValue(payload.subject)}`,
+                        `Message-ID: ${messageId}`,
+                        `Date: ${new Date().toUTCString()}`,
+                        'MIME-Version: 1.0',
+                        `Content-Type: multipart/related; type="multipart/alternative"; boundary="${relBoundary}"`,
+                    ];
+                    const parts: string[] = [
+                        `--${relBoundary}`,
+                        `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+                        '',
+                        `--${altBoundary}`,
+                        'Content-Type: text/plain; charset=utf-8',
+                        'Content-Transfer-Encoding: 8bit',
+                        '',
+                        dotStuffBody(payload.text),
+                        `--${altBoundary}`,
+                        'Content-Type: text/html; charset=utf-8',
+                        'Content-Transfer-Encoding: 8bit',
+                        '',
+                        dotStuffBody(finalHtml),
+                        `--${altBoundary}--`,
+                    ];
+                    for (const att of allAttachments) {
+                        parts.push(
+                            `--${relBoundary}`,
+                            `Content-Type: ${att.contentType}; name="${att.filename}"`,
+                            'Content-Transfer-Encoding: base64',
+                            `Content-ID: <${att.cid}>`,
+                            `Content-Disposition: inline; filename="${att.filename}"`,
+                            '',
+                            att.contentBase64,
+                        );
+                    }
+                    parts.push(`--${relBoundary}--`);
+                    dataPayload = `${headers.join('\r\n')}\r\n\r\n${parts.join('\r\n')}\r\n.`;
+                } else {
+                    const headers = [
+                        `From: ${sanitizeHeaderValue(payload.from)}`,
+                        `To: <${toEnvelope}>`,
+                        `Subject: ${sanitizeHeaderValue(payload.subject)}`,
+                        `Message-ID: ${messageId}`,
+                        `Date: ${new Date().toUTCString()}`,
+                        'MIME-Version: 1.0',
+                        `Content-Type: multipart/alternative; boundary="${altBoundary}"`,
+                    ];
+                    const parts = [
+                        `--${altBoundary}`,
+                        'Content-Type: text/plain; charset=utf-8',
+                        'Content-Transfer-Encoding: 8bit',
+                        '',
+                        dotStuffBody(payload.text),
+                        `--${altBoundary}`,
+                        'Content-Type: text/html; charset=utf-8',
+                        'Content-Transfer-Encoding: 8bit',
+                        '',
+                        dotStuffBody(finalHtml),
+                        `--${altBoundary}--`,
+                    ];
+                    dataPayload = `${headers.join('\r\n')}\r\n\r\n${parts.join('\r\n')}\r\n.`;
+                }
             } else {
                 const headers = [
                     `From: ${sanitizeHeaderValue(payload.from)}`,
@@ -1829,9 +2853,9 @@ ${vehicleLine}
                     'Content-Type: text/plain; charset=utf-8',
                     'Content-Transfer-Encoding: 8bit',
                 ];
-                const dataPayload = `${headers.join('\r\n')}\r\n\r\n${textBody}\r\n.`;
-                await sendCommand(dataPayload, [250]);
+                dataPayload = `${headers.join('\r\n')}\r\n\r\n${dotStuffBody(payload.text)}\r\n.`;
             }
+            await sendCommand(dataPayload, [250]);
 
             try {
                 await sendCommand('QUIT', [221]);
@@ -1881,5 +2905,178 @@ ${vehicleLine}
             if (norm === 'false' || norm === '0') return false;
         }
         return fallback;
+    }
+
+    /**
+     * Retrieves live outbox operational metrics for administrative monitoring.
+     */
+    async getOutboxMetrics(): Promise<{
+        totalCount: number;
+        pendingCount: number;
+        sentCount: number;
+        failedCount: number;
+        deliverySlaRate: number;
+        smtpConfig: {
+            isConfigured: boolean;
+            host: string | null;
+            port: number;
+            secure: boolean;
+            from: string;
+        };
+    }> {
+        await this.ensureSchema();
+        const counts = await this.db.query(`
+            SELECT
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+                COUNT(*) FILTER (WHERE status = 'sent')::int AS sent,
+                COUNT(*) FILTER (WHERE status = 'failed')::int AS failed
+            FROM customer_email_outbox;
+        `);
+
+        const row = counts?.[0] ?? { total: 0, pending: 0, sent: 0, failed: 0 };
+        const total = Number(row.total || 0);
+        const pending = Number(row.pending || 0);
+        const sent = Number(row.sent || 0);
+        const failed = Number(row.failed || 0);
+
+        const deliveredAndFailed = sent + failed;
+        const deliverySlaRate = deliveredAndFailed > 0
+            ? Math.round((sent / deliveredAndFailed) * 1000) / 10
+            : 100;
+
+        const smtp = this.getSmtpConfigSnapshot();
+        return {
+            totalCount: total,
+            pendingCount: pending,
+            sentCount: sent,
+            failedCount: failed,
+            deliverySlaRate,
+            smtpConfig: {
+                // SmtpConfigSnapshot exposes `configured`; there is no TLS policy
+                // setting in the SMTP configuration, so none is reported.
+                isConfigured: smtp.configured,
+                host: smtp.host,
+                port: smtp.port,
+                secure: smtp.secure,
+                from: smtp.from,
+            },
+        };
+    }
+
+    /**
+     * Returns paginated outbox items with optional status filtering and search.
+     */
+    async getOutboxItems(options?: {
+        status?: string;
+        search?: string;
+        limit?: number;
+        offset?: number;
+    }): Promise<{
+        items: Array<{
+            id: string;
+            customerId: string;
+            recipientEmail: string;
+            subject: string;
+            templateType: string | null;
+            status: string;
+            attemptCount: number;
+            maxAttempts: number;
+            nextAttemptAt: string | null;
+            lastError: string | null;
+            createdAt: string;
+            sentAt: string | null;
+        }>;
+        total: number;
+    }> {
+        await this.ensureSchema();
+        const limit = Math.min(Math.max(1, options?.limit ?? 30), 100);
+        const offset = Math.max(0, options?.offset ?? 0);
+
+        const conditions: string[] = ['1=1'];
+        const params: any[] = [];
+        let pIndex = 1;
+
+        if (options?.status && ['pending', 'sent', 'failed'].includes(options.status)) {
+            conditions.push(`o.status = $${pIndex++}`);
+            params.push(options.status);
+        }
+
+        if (options?.search && options.search.trim().length > 0) {
+            conditions.push(`(o.subject ILIKE $${pIndex} OR o.recipient_email ILIKE $${pIndex} OR u.email ILIKE $${pIndex})`);
+            params.push(`%${options.search.trim()}%`);
+            pIndex++;
+        }
+
+        const whereSql = conditions.join(' AND ');
+
+        const countRes = await this.db.query(
+            `SELECT COUNT(*)::int AS count
+             FROM customer_email_outbox o
+             LEFT JOIN users u ON u.id = o.customer_id
+             WHERE ${whereSql}`,
+            params,
+        );
+        const total = Number(countRes?.[0]?.count || 0);
+
+        const rows = await this.db.query(
+            `SELECT o.id,
+                    o.customer_id AS "customerId",
+                    COALESCE(o.recipient_email, u.email, 'unknown') AS "recipientEmail",
+                    o.subject,
+                    o.template_type AS "templateType",
+                    o.status,
+                    COALESCE(o.attempt_count, 0) AS "attemptCount",
+                    COALESCE(o.max_attempts, 3) AS "maxAttempts",
+                    o.next_attempt_at AS "nextAttemptAt",
+                    o.last_error AS "lastError",
+                    o.created_at AS "createdAt",
+                    o.sent_at AS "sentAt"
+             FROM customer_email_outbox o
+             LEFT JOIN users u ON u.id = o.customer_id
+             WHERE ${whereSql}
+             ORDER BY o.created_at DESC
+             LIMIT $${pIndex++} OFFSET $${pIndex++}`,
+            [...params, limit, offset],
+        );
+
+        const sanitizedRows = rows.map((r: any) => ({
+            ...r,
+            lastError: r.lastError ? this.sanitizeError(r.lastError) : null,
+        }));
+
+        return { items: sanitizedRows, total };
+    }
+
+    /**
+     * Safely resets a failed or stuck email outbox row for immediate retry.
+     */
+    async retryOutboxItem(id: string): Promise<{ success: boolean; message: string }> {
+        await this.ensureSchema();
+        const result = await this.db.query(
+            `UPDATE customer_email_outbox
+             SET status = 'pending',
+                 attempt_count = 0,
+                 next_attempt_at = now(),
+                 last_error = NULL,
+                 locked_at = NULL,
+                 updated_at = now()
+             WHERE id = $1::uuid
+               AND status != 'sent'
+               AND message != $2
+             RETURNING id, recipient_email, subject`,
+            [id, REDACTED_OUTBOX_MESSAGE],
+        );
+
+        if (!result || result.length === 0) {
+            return {
+                success: false,
+                message: 'Outbox email record not found or already delivered.',
+            };
+        }
+
+        await this.processOutboxBatch(5).catch(() => {});
+
+        return { success: true, message: 'Email re-enqueued for delivery.' };
     }
 }

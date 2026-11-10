@@ -150,13 +150,15 @@ describe('JwtAuthGuard', () => {
             customer.id,
         );
 
-        expect(request.user).toEqual({
-            id: customer.id,
-            firstName: customer.firstName,
-            lastName: customer.lastName,
-            email: customer.email,
-            role: UserRole.CUSTOMER,
-        });
+        expect(request.user).toEqual(
+            expect.objectContaining({
+                id: customer.id,
+                firstName: customer.firstName,
+                lastName: customer.lastName,
+                email: customer.email,
+                role: UserRole.CUSTOMER,
+            }),
+        );
     });
 
     // ==========================================

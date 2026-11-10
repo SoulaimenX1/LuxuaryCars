@@ -297,20 +297,20 @@ export default function ReservePage() {
   // Agence attribuée au véhicule (sans sélection client).
   // ----------------------------------------------------------
   useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
     setLocationsLoading(true);
     setLocationsError('');
     setAgency(null);
-    fetchVehicleAgency(vehicleId, controller.signal)
-      .then(setAgency)
+    fetchVehicleAgency(vehicleId)
+      .then((data) => { if (active) setAgency(data); })
       .catch((error: unknown) => {
-        if (isAbort(error)) return;
+        if (!active || isAbort(error)) return;
         setLocationsError(messageOf(error));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLocationsLoading(false);
+        if (active) setLocationsLoading(false);
       });
-    return () => controller.abort();
+    return () => { active = false; };
   }, [vehicleId]);
 
   // Changer de lieu réinitialise les dates (la disponibilité change).
@@ -336,20 +336,20 @@ export default function ReservePage() {
       setCalendar(null);
       return;
     }
-    const controller = new AbortController();
+    let active = true;
     setCalendarLoading(true);
     setCalendarError('');
-    fetchAvailabilityCalendar(vehicleId, month, controller.signal)
-      .then(setCalendar)
+    fetchAvailabilityCalendar(vehicleId, month)
+      .then((data) => { if (active) setCalendar(data); })
       .catch((error: unknown) => {
-        if (isAbort(error)) return;
+        if (!active || isAbort(error)) return;
         setCalendar(null);
         setCalendarError(messageOf(error));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setCalendarLoading(false);
+        if (active) setCalendarLoading(false);
       });
-    return () => controller.abort();
+    return () => { active = false; };
   }, [vehicleId, locationId, month]);
 
   // Recaler les créneaux des dates choisies et appliquer, une seule
@@ -380,25 +380,31 @@ export default function ReservePage() {
 
   // Options premium (affichage uniquement ; le prix reste serveur).
   useEffect(() => {
-    const controller = new AbortController();
-    fetchOptions(controller.signal)
-      .then(setOptions)
+    let active = true;
+    fetchOptions()
+      .then((data) => {
+        if (!active) return;
+        setOptions(data);
+        const validIds = new Set(data.map((o) => o.id));
+        setExtraIds((prev) => prev.filter((id) => validIds.has(id)));
+      })
       .catch(() => undefined);
-    return () => controller.abort();
+    return () => { active = false; };
   }, []);
 
   // Permis du client connecté (le serveur revalide à la confirmation).
   useEffect(() => {
-    const controller = new AbortController();
+    let active = true;
     setLicenceLoading(true);
     setLicenceError('');
-    fetchCustomerLicence(controller.signal)
+    fetchCustomerLicence()
       .then(({ profile, missing }) => {
+        if (!active) return;
         setLicence(profile);
         setLicenceMissing(missing);
       })
       .catch((error: unknown) => {
-        if (isAbort(error)) return;
+        if (!active || isAbort(error)) return;
         if (error instanceof BookingApiError && error.status === 401) {
           setAuthRequired(true);
           return;
@@ -406,9 +412,9 @@ export default function ReservePage() {
         setLicenceError(messageOf(error));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setLicenceLoading(false);
+        if (active) setLicenceLoading(false);
       });
-    return () => controller.abort();
+    return () => { active = false; };
   }, []);
 
   // Fermeture de la fenêtre « permis requis » avec la touche Échap.
@@ -425,10 +431,15 @@ export default function ReservePage() {
   // Devis autoritaire + revalidation de l'intervalle complet.
   // ----------------------------------------------------------
   useEffect(() => {
+    const startMs = pickupAt ? new Date(pickupAt).getTime() : NaN;
+    const endMs = returnAt ? new Date(returnAt).getTime() : NaN;
     if (
       !locationId ||
       !pickupAt ||
-      !returnAt
+      !returnAt ||
+      Number.isNaN(startMs) ||
+      Number.isNaN(endMs) ||
+      endMs <= startMs
     ) {
       setQuote(null);
       setQuoteError('');
@@ -437,24 +448,29 @@ export default function ReservePage() {
       setQuoteLoading(false);
       return;
     }
-    const controller = new AbortController();
+    let active = true;
     setQuoteLoading(true);
-    setQuoteError('');
     setChecking(true);
+    setQuoteError('');
 
-    const payload: Record<string, unknown> = {
+    const validExtras = options.length
+      ? extraIds.filter((id) => options.some((o) => o.id === id))
+      : extraIds;
+    const cleanPromo = promotionCode.trim().toUpperCase();
+
+    const quotePayload: Record<string, unknown> = {
       vehicleId,
       pickupAt,
       returnAt,
     };
-    if (extraIds.length) payload.extraIds = extraIds;
-    if (promotionCode.trim()) payload.promotionCode = promotionCode.trim();
+    if (validExtras.length) quotePayload.extraIds = validExtras;
+    if (/^[A-Z0-9_-]{3,30}$/.test(cleanPromo)) quotePayload.promotionCode = cleanPromo;
 
     void Promise.allSettled([
-      fetchQuote(payload, controller.signal)
-        .then(setQuote)
+      fetchQuote(quotePayload)
+        .then((q) => { if (active) setQuote(q); })
         .catch((error: unknown) => {
-          if (isAbort(error)) return;
+          if (!active || isAbort(error)) return;
           setQuote(null);
           setQuoteError(messageOf(error));
         }),
@@ -463,12 +479,11 @@ export default function ReservePage() {
           vehicleId,
           pickupAt,
           returnAt,
-        },
-        controller.signal,
+        }
       )
-        .then(setAvailability)
+        .then((a) => { if (active) setAvailability(a); })
         .catch((error: unknown) => {
-          if (isAbort(error)) return;
+          if (!active || isAbort(error)) return;
           setAvailability({
             available: false,
             reason: 'error',
@@ -477,13 +492,13 @@ export default function ReservePage() {
           });
         }),
     ]).finally(() => {
-      if (!controller.signal.aborted) {
+      if (active) {
         setQuoteLoading(false);
         setChecking(false);
       }
     });
 
-    return () => controller.abort();
+    return () => { active = false; };
   }, [vehicleId, locationId, pickupAt, returnAt, extraIdsKey, promotionCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ----------------------------------------------------------
@@ -504,7 +519,7 @@ export default function ReservePage() {
       setAlternativesLoading(false);
       return;
     }
-    const controller = new AbortController();
+    let active = true;
     setAlternativesLoading(true);
     setAlternativesError('');
     fetchAlternatives(
@@ -512,19 +527,18 @@ export default function ReservePage() {
         vehicleId,
         pickupAt,
         returnAt,
-      },
-      controller.signal,
+      }
     )
-      .then(setAlternatives)
+      .then((data) => { if (active) setAlternatives(data); })
       .catch((error: unknown) => {
-        if (isAbort(error)) return;
+        if (!active || isAbort(error)) return;
         setAlternatives(null);
         setAlternativesError(messageOf(error));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setAlternativesLoading(false);
+        if (active) setAlternativesLoading(false);
       });
-    return () => controller.abort();
+    return () => { active = false; };
   }, [vehicleId, locationId, pickupAt, returnAt, availability]);
 
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -628,10 +642,22 @@ export default function ReservePage() {
   }
 
   async function confirm() {
+    if (authRequired) {
+      router.push(`/auth/login?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+      return;
+    }
     // Sans permis enregistré, la confirmation ouvre une fenêtre
     // explicative au lieu d'appeler l'API.
-    if (licenceMissing || !licence) {
+    if (licenceMissing || !licence || !licence.licenseNumber) {
       setSubmitError('');
+      setShowLicenceModal(true);
+      return;
+    }
+    const expiresOn = typeof licence.licenseExpiresOn === 'string'
+      ? licence.licenseExpiresOn.slice(0, 10)
+      : '';
+    if (returnDate && expiresOn && expiresOn < returnDate) {
+      setSubmitError('Your driving licence expires before the selected return date.');
       setShowLicenceModal(true);
       return;
     }
@@ -771,21 +797,26 @@ export default function ReservePage() {
   const returnLabel = returnDate
     ? `${formatDate(returnDate)} · ${returnTime}${timezone ? ` (${timezone})` : ''}`
     : 'Not selected';
+  const isClientLicenceVerified = Boolean(
+    !authRequired &&
+    !licenceLoading &&
+    !licenceMissing &&
+    licence &&
+    typeof licence.licenseNumber === 'string' &&
+    licence.licenseNumber.trim().length > 0 &&
+    (!returnDate ||
+      typeof licence.licenseExpiresOn !== 'string' ||
+      licence.licenseExpiresOn.slice(0, 10) >= returnDate),
+  );
+
   const canConfirm = Boolean(
+    isClientLicenceVerified &&
     agency &&
     !locationsLoading &&
     availability?.available &&
     quote &&
     !quoteLoading &&
     !checking &&
-    !authRequired &&
-    !licenceLoading &&
-    !licenceMissing &&
-    licence &&
-    typeof licence.licenseNumber === 'string' &&
-    licence.licenseNumber.trim() &&
-    typeof licence.licenseExpiresOn === 'string' &&
-    licence.licenseExpiresOn.slice(0, 10) >= returnDate &&
     pickupAt &&
     returnAt &&
     new Date(returnAt).getTime() > new Date(pickupAt).getTime() &&
@@ -819,6 +850,21 @@ export default function ReservePage() {
             sign in
           </Link>{' '}
           to complete and confirm your reservation.
+        </div>
+      )}
+
+      {!authRequired && !licenceLoading && !isClientLicenceVerified && (
+        <div className={bookingStyles.noticeBox} role="alert">
+          <strong>Client verification required:</strong> Non-verified clients cannot create
+          reservations. Please{' '}
+          <Link
+            href="/account/profile"
+            className={bookingStyles.inlineLink}
+            title="Verify your driving licence profile"
+          >
+            complete and verify your driving licence profile
+          </Link>{' '}
+          before booking.
         </div>
       )}
 

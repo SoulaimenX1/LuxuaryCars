@@ -815,3 +815,13 @@
     padding: 20px 16px;
   }
 }
+
+@media (max-width: 600px) {
+  .compareScroll table {
+    min-width: 0 !important;
+    font-size: 11.5px;
+  }
+  .compareScroll th, .compareScroll td {
+    padding: 8px 10px;
+  }
+}

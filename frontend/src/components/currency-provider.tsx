@@ -21,49 +21,69 @@ interface CurrencyContextValue {
 
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
+let memoryCachedRates: { rates: Record<string, number>; asOf: string } | null = null;
+let inFlightRatesPromise: Promise<{ rates: Record<string, number>; asOf: string } | null> | null = null;
+
+async function fetchRatesOnce(): Promise<{ rates: Record<string, number>; asOf: string } | null> {
+  if (memoryCachedRates) return memoryCachedRates;
+  if (inFlightRatesPromise) return inFlightRatesPromise;
+
+  inFlightRatesPromise = (async () => {
+    try {
+      const response = await fetch('/api/currency-rates');
+      if (!response.ok) return null;
+      const data: unknown = await response.json();
+      if (!data || typeof data !== 'object' || !('rates' in data) ||
+          !('asOf' in data) || typeof (data as { asOf: unknown }).asOf !== 'string') {
+        return null;
+      }
+      const candidate = (data as { rates: Record<string, unknown> }).rates;
+      const usable: Record<string, number> = { EUR: 1 };
+      for (const code of DISPLAY_CURRENCIES) {
+        const rate = candidate[code];
+        if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) usable[code] = rate;
+      }
+      memoryCachedRates = { rates: usable, asOf: (data as { asOf: string }).asOf };
+      return memoryCachedRates;
+    } catch {
+      return null;
+    } finally {
+      inFlightRatesPromise = null;
+    }
+  })();
+
+  return inFlightRatesPromise;
+}
+
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [currency, setSelectedCurrency] = useState<DisplayCurrency>('EUR');
-  const [rates, setRates] = useState<Record<string, number>>({ EUR: 1 });
-  const [asOf, setAsOf] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [rates, setRates] = useState<Record<string, number>>(memoryCachedRates?.rates ?? { EUR: 1 });
+  const [asOf, setAsOf] = useState<string | null>(memoryCachedRates?.asOf ?? null);
+  const [loading, setLoading] = useState(!memoryCachedRates);
   const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
     async function loadRates() {
-      try {
-        const response = await fetch('/api/currency-rates', { signal: controller.signal });
-        if (!response.ok) throw new Error('Reference rates unavailable');
-        const data: unknown = await response.json();
-        if (!data || typeof data !== 'object' || !('rates' in data) ||
-            !('asOf' in data) || typeof data.asOf !== 'string') {
-          throw new Error('Invalid reference rates');
+      const result = await fetchRatesOnce();
+      if (cancelled) return;
+      if (result) {
+        setRates(result.rates);
+        setAsOf(result.asOf);
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved && DISPLAY_CURRENCIES.includes(saved as DisplayCurrency) && result.rates[saved]) {
+          setSelectedCurrency(saved as DisplayCurrency);
         }
-        const candidate = data.rates as Record<string, unknown>;
-        const usable: Record<string, number> = { EUR: 1 };
-        for (const code of DISPLAY_CURRENCIES) {
-          const rate = candidate[code];
-          if (typeof rate === 'number' && Number.isFinite(rate) && rate > 0) usable[code] = rate;
-        }
-        if (!controller.signal.aborted) {
-          setRates(usable);
-          setAsOf(data.asOf);
-          const saved = localStorage.getItem(STORAGE_KEY);
-          if (saved && DISPLAY_CURRENCIES.includes(saved as DisplayCurrency) && usable[saved]) {
-            setSelectedCurrency(saved as DisplayCurrency);
-          }
-        }
-      } catch {
-        if (!controller.signal.aborted) {
-          setWarning('Live exchange rates are unavailable. Showing EUR prices.');
-          setSelectedCurrency('EUR');
-        }
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
+      } else {
+        setWarning('Live exchange rates are unavailable. Showing EUR prices.');
+        setSelectedCurrency('EUR');
       }
+      setLoading(false);
     }
     void loadRates();
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setCurrency = useCallback((next: DisplayCurrency) => {

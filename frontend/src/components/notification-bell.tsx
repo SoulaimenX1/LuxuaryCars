@@ -89,8 +89,8 @@ export default function NotificationBell({ admin = false }: { admin?: boolean })
         <path d="M18 8.5a6 6 0 0 0-12 0c0 6-2.5 7.5-2.5 7.5h17S18 14.5 18 8.5z" />
         <path d="M13.7 20a2 2 0 0 1-3.4 0" />
       </svg>
-      {unread > 0 && <span className={styles.badge}>{unread > 9 ? '9+' : unread}</span>}
     </button>
+    {unread > 0 && <span className={styles.badge} aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}
     {open && <div className={styles.panel}>
       <div className={styles.panelHeader}>
         <strong>Notifications</strong>

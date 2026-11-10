@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     Inject,
     Injectable,
     Optional,
@@ -9,7 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import argon2 from 'argon2';
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { isIP } from 'node:net';
 import { DataSource } from 'typeorm';
 
@@ -41,8 +42,64 @@ export interface AuthRequestMetadata {
     userAgent?: string | null;
 }
 
+export interface OptionalAuthContext {
+    userId?: string | null;
+    email?: string | null;
+    authorizationHeader?: string | null;
+}
+
 export function generateOpaqueToken(): string {
     return randomBytes(32).toString('base64url');
+}
+
+export function generateMfaRefreshToken(): string {
+    return `rt_mfa_${generateOpaqueToken()}`;
+}
+
+export function formatMfaUserAgent(
+    rawUserAgent: string | null | undefined,
+    amr?: string[] | null,
+): string | null {
+    if (!amr || amr.length === 0) {
+        if (!rawUserAgent || typeof rawUserAgent !== 'string') return null;
+        const clean = rawUserAgent.replace(/\[mfa:[^\]]*\]/g, '').trim();
+        return clean.length > 0 ? clean.slice(0, 500) : null;
+    }
+    const cleanUa =
+        typeof rawUserAgent === 'string' && rawUserAgent.trim().length > 0
+            ? rawUserAgent.replace(/\[mfa:[^\]]*\]/g, '').trim()
+            : 'client';
+    const tag = `[mfa:${amr.join(',')}]`;
+    const combined = `${cleanUa} ${tag}`.trim();
+    return combined.slice(0, 500);
+}
+
+export function extractMfaAmr(
+    userAgent: string | null | undefined,
+    rawToken?: string | null,
+): string[] | null {
+    if (typeof rawToken === 'string' && rawToken.startsWith('rt_mfa_')) {
+        if (userAgent) {
+            const match = userAgent.match(/\[mfa:([^\]]+)\]/);
+            if (match && match[1]) {
+                const list = match[1]
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+                if (list.length > 0) return list;
+            }
+        }
+        return ['mfa'];
+    }
+
+    if (!userAgent || typeof userAgent !== 'string') return null;
+    const match = userAgent.match(/\[mfa:([^\]]+)\]/);
+    if (!match || !match[1]) return null;
+    const list = match[1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    return list.length > 0 ? list : null;
 }
 
 export function hashAuthToken(rawToken: string): string {
@@ -92,17 +149,73 @@ export class AuthService {
     // ==========================================
 
     async register(dto: RegisterDto) {
+        const normalizedEmail = dto.email
+            .trim()
+            .toLowerCase();
         const passwordHash = await argon2.hash(
             dto.password,
         );
 
-        const user = await this.usersService.createCustomer({
-            firstName: dto.firstName,
-            lastName: dto.lastName,
-            email: dto.email,
-            passwordHash,
-            phone: dto.phone,
-        });
+        let user;
+        try {
+            user = await this.usersService.createCustomer({
+                firstName: dto.firstName,
+                lastName: dto.lastName,
+                email: normalizedEmail,
+                passwordHash,
+                phone: dto.phone,
+            });
+        } catch (error) {
+            if (error instanceof ConflictException) {
+                // Safe duplicate-email mitigation: do not leak 409 or existing account metadata.
+                // If the existing account is active and unverified, silently send a verification link.
+                if (this.dataSource) {
+                    try {
+                        const existingUser =
+                            await this.usersService.findByEmail?.(
+                                normalizedEmail,
+                            );
+                        if (
+                            existingUser &&
+                            existingUser.status === AccountStatus.ACTIVE &&
+                            !existingUser.emailVerifiedAt
+                        ) {
+                            const issued = await this.issueOneTimeToken(
+                                existingUser.id,
+                                'email_verification',
+                                this.getEmailVerificationExpiresInSeconds(),
+                            );
+                            await this.emailOutbox?.safelyNotifyEmailVerification({
+                                customerId: existingUser.id,
+                                recipientEmail: existingUser.email,
+                                customerName: `${existingUser.firstName} ${existingUser.lastName}`,
+                                token: issued.rawToken,
+                                tokenId: issued.tokenId,
+                                expiresAt: issued.expiresAt,
+                            });
+                        } else {
+                            hashAuthToken(generateOpaqueToken());
+                        }
+                    } catch {
+                        // Non-blocking
+                    }
+                } else {
+                    hashAuthToken(generateOpaqueToken());
+                }
+
+                return {
+                    id: randomUUID(),
+                    firstName: dto.firstName.trim(),
+                    lastName: dto.lastName.trim(),
+                    email: normalizedEmail,
+                    role: UserRole.CUSTOMER,
+                    status: AccountStatus.ACTIVE,
+                    createdAt: new Date(),
+                };
+            }
+
+            throw error;
+        }
 
         if (this.dataSource) {
             try {
@@ -174,11 +287,46 @@ export class AuthService {
             );
         }
 
-        // Generate the short-lived JWT access token
+        const isPrivileged = user.role === UserRole.ADMIN || user.role === UserRole.STAFF;
+        const isMfaEnforcedGlobal = process.env.ENABLE_MANDATORY_ADMIN_MFA === 'true';
+
+        // Mandatory MFA for privileged roles when enabled via feature flag
+        if (isMfaEnforcedGlobal && isPrivileged) {
+            const preAuthToken = await this.jwtService.signAsync(
+                {
+                    sub: user.id,
+                    role: user.role,
+                    scope: 'mfa_pending',
+                    pre_auth: true,
+                    mfa_verified: false,
+                    amr: ['pwd'],
+                },
+                { expiresIn: 300 }, // 5 minutes strict TTL
+            );
+
+            return {
+                mfaRequired: true,
+                preAuthToken,
+                expiresIn: 300,
+                tokenType: 'Bearer',
+                user: {
+                    id: user.id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    role: user.role,
+                },
+            };
+        }
+
+        // Generate the short-lived JWT access token with assurance claims
         const accessToken =
             await this.jwtService.signAsync({
                 sub: user.id,
                 role: user.role,
+                scope: 'authenticated',
+                mfa_verified: false,
+                amr: ['pwd'],
             });
 
         const expiresIn = this.getAccessExpiresInSeconds();
@@ -188,11 +336,7 @@ export class AuthService {
         if (this.dataSource) {
             const tokenHash = hashAuthToken(refreshToken);
             const ipAddress = normalizeInetAddress(meta?.ipAddress);
-            const userAgent =
-                typeof meta?.userAgent === 'string' &&
-                meta.userAgent.trim().length > 0
-                    ? meta.userAgent.trim().slice(0, 500)
-                    : null;
+            const userAgent = formatMfaUserAgent(meta?.userAgent, null);
 
             await this.dataSource.query(
                 `INSERT INTO refresh_tokens
@@ -269,6 +413,7 @@ export class AuthService {
                     userId: string;
                     expiresAt: Date;
                     revokedAt: Date | null;
+                    userAgent: string | null;
                     firstName: string;
                     lastName: string;
                     email: string;
@@ -279,6 +424,7 @@ export class AuthService {
                             rt.user_id AS "userId",
                             rt.expires_at AS "expiresAt",
                             rt.revoked_at AS "revokedAt",
+                            rt.user_agent AS "userAgent",
                             u.first_name AS "firstName",
                             u.last_name AS "lastName",
                             u.email,
@@ -330,8 +476,18 @@ export class AuthService {
                     [record.tokenId],
                 );
 
-                const newRefreshToken = generateOpaqueToken();
+                // Determine whether the session being refreshed was MFA-verified
+                const mfaAmr = extractMfaAmr(record.userAgent, dto.refreshToken);
+                const isMfaVerified = mfaAmr !== null && mfaAmr.length > 0;
+
+                const newRefreshToken = isMfaVerified
+                    ? generateMfaRefreshToken()
+                    : generateOpaqueToken();
                 const newTokenHash = hashAuthToken(newRefreshToken);
+
+                const nextUserAgent = isMfaVerified
+                    ? formatMfaUserAgent(userAgent || record.userAgent, mfaAmr)
+                    : formatMfaUserAgent(userAgent, null);
 
                 await manager.query(
                     `INSERT INTO refresh_tokens
@@ -343,13 +499,15 @@ export class AuthService {
                         newTokenHash,
                         refreshExpiresIn,
                         ipAddress,
-                        userAgent,
+                        nextUserAgent,
                     ],
                 );
 
                 return {
                     valid: true as const,
                     newRefreshToken,
+                    isMfaVerified,
+                    mfaAmr: mfaAmr ?? [],
                     user: {
                         id: record.userId,
                         firstName: record.firstName,
@@ -370,6 +528,11 @@ export class AuthService {
         const accessToken = await this.jwtService.signAsync({
             sub: outcome.user.id,
             role: outcome.user.role,
+            scope: 'authenticated',
+            mfa_verified: outcome.isMfaVerified,
+            amr: outcome.isMfaVerified
+                ? ['refresh', ...outcome.mfaAmr]
+                : ['refresh'],
         });
 
         return {
@@ -408,30 +571,51 @@ export class AuthService {
 
     async requestEmailVerification(
         dto: RequestEmailVerificationDto,
+        authContext?: OptionalAuthContext,
     ): Promise<{ message: string; alreadyVerified?: boolean }> {
+        const startedAt = performance.now();
         const genericResponse = {
             message:
                 'If that account exists and is unverified, a verification email has been sent.',
         };
 
         if (!this.dataSource) {
+            hashAuthToken(generateOpaqueToken());
+            await this.equalizePublicRequestTiming(startedAt);
             return genericResponse;
         }
 
-        const user = await this.usersService.findByEmail(dto.email);
+        const [user, authUser] = await Promise.all([
+            this.usersService.findByEmail(dto.email),
+            this.resolveOptionalAuthenticatedUser(authContext),
+        ]);
+
         if (
             !user ||
             user.status !== AccountStatus.ACTIVE
         ) {
+            hashAuthToken(generateOpaqueToken());
+            await this.equalizePublicRequestTiming(startedAt);
             return genericResponse;
         }
 
+        const isAuthenticatedSelf = Boolean(
+            authUser &&
+                authUser.id === user.id &&
+                authUser.email === user.email.trim().toLowerCase(),
+        );
+
         if (user.emailVerifiedAt) {
-            return {
-                message:
-                    'This email address has already been verified. You can sign in directly.',
-                alreadyVerified: true,
-            };
+            hashAuthToken(generateOpaqueToken());
+            await this.equalizePublicRequestTiming(startedAt);
+            if (isAuthenticatedSelf) {
+                return {
+                    message:
+                        'This email address has already been verified. You can sign in directly.',
+                    alreadyVerified: true,
+                };
+            }
+            return genericResponse;
         }
 
         const issued = await this.issueOneTimeToken(
@@ -449,11 +633,13 @@ export class AuthService {
             expiresAt: issued.expiresAt,
         });
 
+        await this.equalizePublicRequestTiming(startedAt);
         return genericResponse;
     }
 
     async confirmEmailVerification(
         dto: ConfirmEmailVerificationDto,
+        authContext?: OptionalAuthContext,
     ) {
         if (!this.dataSource) {
             throw new BadRequestException(
@@ -462,6 +648,8 @@ export class AuthService {
         }
 
         const tokenHash = hashAuthToken(dto.token);
+        const authUser =
+            await this.resolveOptionalAuthenticatedUser(authContext);
 
         return this.dataSource.transaction(async (manager) => {
             const rows: {
@@ -492,16 +680,22 @@ export class AuthService {
 
             const record = rows[0];
 
-            // If token was not found, but email was provided, check if that account is already verified
-            if (!record && dto.email) {
+            // Only reveal already-verified status without a valid token when the caller
+            // is authenticated as that exact account. Never leak status to unauthenticated callers.
+            if (
+                !record &&
+                authUser &&
+                (!dto.email ||
+                    dto.email.trim().toLowerCase() === authUser.email)
+            ) {
                 const userRows: {
                     status: AccountStatus;
                     emailVerifiedAt: Date | null;
                 }[] = await manager.query(
                     `SELECT status, email_verified_at AS "emailVerifiedAt"
                      FROM users
-                     WHERE email = $1::varchar`,
-                    [dto.email.trim().toLowerCase()],
+                     WHERE id = $1::uuid AND email = $2::varchar`,
+                    [authUser.id, authUser.email],
                 );
                 if (
                     userRows[0]?.status === AccountStatus.ACTIVE &&
@@ -523,6 +717,20 @@ export class AuthService {
                 );
             }
 
+            // DETECT ALREADY-VERIFIED ACCOUNTS:
+            // When an already-verified user re-submits a token (duplicate
+            // clicks, email-scanner pre-fetch, page refresh, or expired link on an already-verified account),
+            // report success rather than a confusing error. No state is changed.
+            if (record.userEmailVerifiedAt) {
+                return {
+                    verified: true,
+                    alreadyVerified: true,
+                    emailVerifiedAt: record.userEmailVerifiedAt,
+                    message:
+                        'Your email address has already been verified. You can sign in directly.',
+                };
+            }
+
             // STRICT EXPIRY: a verification token is valid for at most
             // EMAIL_VERIFICATION_TTL (5 minutes) after issuance. Expiry is
             // evaluated against the database clock, which is authoritative.
@@ -532,20 +740,6 @@ export class AuthService {
                 throw new BadRequestException(
                     'Invalid or expired verification token',
                 );
-            }
-
-            // DETECT ALREADY-VERIFIED ACCOUNTS:
-            // When an already-verified user re-submits a still-valid token (duplicate
-            // clicks, email-scanner pre-fetch, page refresh), report success rather
-            // than a confusing error. No state is changed.
-            if (record.userEmailVerifiedAt) {
-                return {
-                    verified: true,
-                    alreadyVerified: true,
-                    emailVerifiedAt: record.userEmailVerifiedAt,
-                    message:
-                        'Your email address has already been verified. You can sign in directly.',
-                };
             }
 
             // SINGLE USE: a token that was already consumed (or superseded by a
@@ -589,17 +783,22 @@ export class AuthService {
     async requestPasswordReset(
         dto: RequestPasswordResetDto,
     ) {
+        const startedAt = performance.now();
         const genericResponse = {
             message:
                 'If an account with that email exists, password reset instructions have been sent.',
         };
 
         if (!this.dataSource) {
+            hashAuthToken(generateOpaqueToken());
+            await this.equalizePublicRequestTiming(startedAt);
             return genericResponse;
         }
 
         const user = await this.usersService.findByEmail(dto.email);
         if (!user || user.status !== AccountStatus.ACTIVE) {
+            hashAuthToken(generateOpaqueToken());
+            await this.equalizePublicRequestTiming(startedAt);
             return genericResponse;
         }
 
@@ -618,6 +817,7 @@ export class AuthService {
             expiresAt: issued.expiresAt,
         });
 
+        await this.equalizePublicRequestTiming(startedAt);
         return genericResponse;
     }
 
@@ -791,6 +991,63 @@ export class AuthService {
             300,
         );
         return Math.min(ttl, 300);
+    }
+
+    private async resolveOptionalAuthenticatedUser(
+        authContext?: OptionalAuthContext,
+    ): Promise<{ id: string; email: string } | null> {
+        if (!authContext) {
+            return null;
+        }
+        if (authContext.userId && authContext.email) {
+            return {
+                id: authContext.userId,
+                email: authContext.email.trim().toLowerCase(),
+            };
+        }
+        const authorization = authContext.authorizationHeader?.trim();
+        if (!authorization) {
+            return null;
+        }
+        const [scheme, token] = authorization.split(' ');
+        if (scheme !== 'Bearer' || !token) {
+            return null;
+        }
+        try {
+            const payload = await this.jwtService?.verifyAsync<{ sub: string }>(
+                token,
+            );
+            if (!payload?.sub || typeof payload.sub !== 'string') {
+                return null;
+            }
+            const user = await this.usersService?.findById?.(payload.sub);
+            if (!user || user.status !== AccountStatus.ACTIVE) {
+                return null;
+            }
+            return {
+                id: user.id,
+                email: user.email.trim().toLowerCase(),
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    private async equalizePublicRequestTiming(
+        startedAtMs: number,
+    ): Promise<void> {
+        const minDurationMs = this.getPositiveNumber(
+            'AUTH_PUBLIC_MIN_RESPONSE_MS',
+            45,
+        );
+        const jitterMs = randomBytes(1)[0] % 8;
+        const targetMs = minDurationMs + jitterMs;
+        const elapsedMs = performance.now() - startedAtMs;
+        if (elapsedMs < targetMs) {
+            await new Promise((resolve) =>
+                setTimeout(resolve, Math.ceil(targetMs - elapsedMs)),
+            );
+        }
     }
 
     private getPositiveNumber(

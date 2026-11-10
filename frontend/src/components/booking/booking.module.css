@@ -979,3 +979,41 @@
   font-size: .78rem;
   color: var(--muted);
 }
+
+
+/* -------------------- Dynamic Pricing UI -------------------- */
+
+.dynamicRateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .35rem .75rem;
+  margin-bottom: .85rem;
+  border-radius: var(--radius-field);
+  background: var(--champagne-soft);
+  border: 1px solid var(--champagne-line);
+  font-size: .8rem;
+  color: var(--gold-text);
+  font-weight: 500;
+}
+
+.dynamicRatePulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--champagne-2);
+}
+
+.dynamicAdjustmentRow td {
+  padding-left: 1rem;
+  font-size: .84rem;
+  color: var(--muted-text);
+  border-bottom: 1px dashed var(--line-soft);
+}
+
+.taxNotice {
+  margin-top: .6rem;
+  font-size: .78rem;
+  color: var(--muted);
+  text-align: right;
+}

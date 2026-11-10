@@ -6,11 +6,8 @@ import {
 } from 'react';
 
 import Link from 'next/link';
-
-import {
-    useRouter,
-} from 'next/navigation';
-
+import { useRouter } from 'next/navigation';
+import { startAuthentication } from '@simplewebauthn/browser';
 import { notifyAuthChanged } from '@/components/site-chrome';
 import { useToast } from '@/components/toast';
 import styles from '../auth.module.css';
@@ -28,6 +25,10 @@ interface LoginResponse {
         role?: string;
         status?: string;
     };
+
+    mfaRequired?: boolean;
+    preAuthToken?: string;
+    expiresIn?: number;
 
     message?:
     | string
@@ -71,6 +72,79 @@ export default function LoginPage() {
         error,
         setError,
     ] = useState('');
+
+    const [
+        passkeyLoading,
+        setPasskeyLoading,
+    ] = useState(false);
+
+    async function handlePasskeyLogin() {
+        setError('');
+        setPasskeyLoading(true);
+        try {
+            const optRes = await fetch('/api/auth/passkeys/authenticate/options', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email.trim() || undefined }),
+            });
+            if (!optRes.ok) {
+                const err = await optRes.json();
+                throw new Error(err.message || 'Unable to initialize passkey sign-in.');
+            }
+            const options = await optRes.json();
+
+            const assertionResponse = await startAuthentication({ optionsJSON: options });
+
+            const verRes = await fetch('/api/auth/passkeys/authenticate/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    response: assertionResponse,
+                    challenge: options.challenge,
+                }),
+            });
+            const data = await verRes.json();
+            if (!verRes.ok) {
+                throw new Error(data.message || 'Passkey authentication failed.');
+            }
+
+            notifyAuthChanged();
+            toast.success('Signed in successfully with Windows Hello / Passkey.', 'Sign in');
+
+            if (data.user?.role === 'admin') {
+                router.replace('/admin');
+                router.refresh();
+                return;
+            }
+
+            if (data.user?.role === 'staff') {
+                router.replace('/admin/rentals');
+                router.refresh();
+                return;
+            }
+
+            if (data.user?.role === 'customer') {
+                router.replace('/account');
+                router.refresh();
+                return;
+            }
+
+            router.replace('/account');
+            router.refresh();
+            return;
+        } catch (err: unknown) {
+            const errorObj = err instanceof Error ? err : new Error(String(err));
+            if (errorObj.name === 'NotAllowedError') {
+                toast.error('Passkey sign in was cancelled or timed out.');
+            } else {
+                const msg = errorObj.message || 'Unable to sign in with passkey.';
+                setError(msg);
+                toast.error(msg, 'Sign in');
+            }
+        } finally {
+            setPasskeyLoading(false);
+        }
+    }
 
     // ========================================================
     // SOUMISSION DU LOGIN
@@ -152,6 +226,21 @@ export default function LoginPage() {
                 return;
             }
 
+            // ==========================================================
+            // MFA REQUIRED (MANDATORY ADMIN / STAFF STEP)
+            // ==========================================================
+
+            if (data.mfaRequired && data.preAuthToken) {
+                if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('lux_mfa_pre_auth', data.preAuthToken);
+                    if (data.user) {
+                        sessionStorage.setItem('lux_mfa_user', JSON.stringify(data.user));
+                    }
+                }
+                router.push('/mfa/verify');
+                return;
+            }
+
             // ----------------------------------------------------
             // ADMIN
             // ----------------------------------------------------
@@ -222,6 +311,7 @@ export default function LoginPage() {
             className={
                 styles.page
             }
+            suppressHydrationWarning
         >
 
             {/* ============================================= */}
@@ -234,36 +324,20 @@ export default function LoginPage() {
                 }
             >
 
-                <Link
-                    href="/"
+                <div
                     className={
-                        styles.logo
+                        styles.visualEyebrow
                     }
                 >
-
                     <span
                         className={
-                            styles.logoMark
+                            styles.visualEyebrowDot
                         }
-                    >
-                        L
+                    />
+                    <span>
+                        CLIENT ACCESS
                     </span>
-
-                    <span
-                        className={
-                            styles.logoText
-                        }
-                    >
-                        <strong>
-                            LUXURY
-                        </strong>
-
-                        <span>
-                            CAR RENTAL
-                        </span>
-                    </span>
-
-                </Link>
+                </div>
 
                 <div
                     className={
@@ -276,11 +350,11 @@ export default function LoginPage() {
                             styles.visualLabel
                         }
                     >
-                        CUSTOMER ACCESS
+                        EXCLUSIVE FLEET
                     </span>
 
                     <h1>
-                        Welcome
+                        Welcome{' '}
                         <span>
                             back
                         </span>
@@ -295,13 +369,25 @@ export default function LoginPage() {
 
                 </div>
 
-                <span
+                <div
                     className={
                         styles.visualFooter
                     }
                 >
-                    SECURE ACCESS · JWT AUTHENTICATION
-                </span>
+                    <span>
+                        SECURE ACCESS
+                    </span>
+                    <span
+                        className={
+                            styles.footerBullet
+                        }
+                    >
+                        ·
+                    </span>
+                    <span>
+                        ENCRYPTED AUTHENTICATION
+                    </span>
+                </div>
 
             </section>
 
@@ -321,22 +407,44 @@ export default function LoginPage() {
                     }
                 >
 
-                    <Link
-                        href="/"
+                    <div
                         className={
-                            styles.backLink
+                            styles.formNav
                         }
                     >
-                        ← Back to home
-                    </Link>
+                        <Link
+                            href="/"
+                            className={
+                                styles.backLink
+                            }
+                        >
+                            <svg
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
+                            >
+                                <line x1="19" y1="12" x2="5" y2="12" />
+                                <polyline points="12 19 5 12 12 5" />
+                            </svg>
+                            <span>
+                                Back to home
+                            </span>
+                        </Link>
 
-                    <span
-                        className={
-                            styles.formLabel
-                        }
-                    >
-                        SIGN IN
-                    </span>
+                        <span
+                            className={
+                                styles.formLabel
+                            }
+                        >
+                            SIGN IN
+                        </span>
+                    </div>
 
                     <h2>
                         Access your account
@@ -454,7 +562,7 @@ export default function LoginPage() {
                             }
                             type="submit"
                             disabled={
-                                loading
+                                loading || passkeyLoading
                             }
                         >
                             {loading
@@ -462,35 +570,121 @@ export default function LoginPage() {
                                 : 'Sign in'}
                         </button>
 
+                        <div
+                            className={
+                                styles.authDivider
+                            }
+                        >
+                            <span
+                                className={
+                                    styles.dividerLine
+                                }
+                            />
+                            <span
+                                className={
+                                    styles.dividerText
+                                }
+                            >
+                                or continue with
+                            </span>
+                            <span
+                                className={
+                                    styles.dividerLine
+                                }
+                            />
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={handlePasskeyLogin}
+                            disabled={loading || passkeyLoading}
+                            className={styles.passkeyButton}
+                            aria-label="Sign in with Windows Hello or Passkey"
+                        >
+                            {passkeyLoading ? (
+                                <>
+                                    <svg
+                                        className={styles.passkeySpinner}
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        aria-hidden="true"
+                                    >
+                                        <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+                                        <path d="M12 2a10 10 0 0 1 10 10" />
+                                    </svg>
+                                    <span>Waiting for Windows Hello...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <svg
+                                        className={styles.passkeyIcon}
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.75"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        aria-hidden="true"
+                                    >
+                                        <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 3" />
+                                        <path d="M14 13.12c0 2.38 0 6.38-1 8.88" />
+                                        <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02" />
+                                        <path d="M2 12a10 10 0 0 1 18-6" />
+                                        <path d="M2 16h.01" />
+                                        <path d="M21.8 16c.2-2 .131-5.354 0-6" />
+                                        <path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2" />
+                                        <path d="M8.65 22c.21-.66.45-1.32.57-2" />
+                                        <path d="M9 6.8a6 6 0 0 1 9 5.2c0 .47 0 1.17-.02 2" />
+                                    </svg>
+                                    <span>Sign in with Windows Hello / Passkey</span>
+                                </>
+                            )}
+                        </button>
+
                     </form>
 
-                    <p
+                    <div
                         className={
-                            styles.switchText
+                            styles.authLinks
                         }
                     >
-                        <Link href="/forgot-password">
-                            Forgot your password?
-                        </Link>{' '}
-                        ·{' '}
-                        <Link href="/verify-email">
-                            Verify email
-                        </Link>
-                    </p>
-
-                    <p
-                        className={
-                            styles.switchText
-                        }
-                    >
-                        New customer?{' '}
-
-                        <Link
-                            href="/register"
+                        <p
+                            className={
+                                styles.switchText
+                            }
                         >
-                            Create an account
-                        </Link>
-                    </p>
+                            <Link href="/forgot-password">
+                                Forgot your password?
+                            </Link>
+                            <span
+                                className={
+                                    styles.linkDot
+                                }
+                            >
+                                ·
+                            </span>
+                            <Link href="/verify-email">
+                                Verify email
+                            </Link>
+                        </p>
+
+                        <p
+                            className={
+                                styles.switchTextSecondary
+                            }
+                        >
+                            New customer?{' '}
+                            <Link
+                                href="/register"
+                            >
+                                Create an account
+                            </Link>
+                        </p>
+                    </div>
 
                 </div>
 

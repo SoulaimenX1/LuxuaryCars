@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { getServerSessionUser } from '@/lib/server-auth';
+import { buildApiUrl } from '@/lib/api';
 
 import {
   EDITORIAL_VIDEO,
@@ -9,6 +10,7 @@ import {
 
 import LuxeVideo from '@/components/luxe-video';
 import HomeHighlights from '@/components/home/highlights';
+import FleetBrandsStrip from '@/components/home/fleet-brands-strip';
 
 import styles from './home.module.css';
 
@@ -169,6 +171,26 @@ export default async function HomePage() {
   const authenticated = Boolean(sessionUser);
   const isAdmin = sessionUser?.role === 'admin' || sessionUser?.role === 'staff';
 
+  let fleetBrands: { name: string; logoUrl: string }[] = [];
+  try {
+    const res = await fetch(buildApiUrl('/vehicles/brands?inFleet=true'), {
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        fleetBrands = data
+          .filter(
+            (b): b is { name: string; logoUrl: string } =>
+              Boolean(b.logoUrl && typeof b.logoUrl === 'string' && b.logoUrl.trim() !== ''),
+          )
+          .map((b) => ({ name: b.name, logoUrl: b.logoUrl }));
+      }
+    }
+  } catch {
+    // Repli silencieux en cas d'indisponibilité momentanée
+  }
+
   return (
     <main className={styles.page}>
       <section className={styles.hero}>
@@ -292,6 +314,8 @@ export default async function HomePage() {
               journey.
             </p>
           </div>
+
+          <FleetBrandsStrip initialBrands={fleetBrands} />
 
           <div className={styles.categoryGrid}>
             {categories.map((category) => (

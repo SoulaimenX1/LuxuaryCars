@@ -1,19 +1,20 @@
 import {describe,it,expect,vi} from 'vitest';
 import type {DataSource} from 'typeorm';
 import {LocationsService} from '../locations/locations.service.js';
+import type {DynamicPricingService} from '../pricing/dynamic-pricing.service.js';
 import {PremiumService as PremiumServiceImpl} from './premium.service.js';
 
 const AGENCY='550e8400-e29b-41d4-a716-446655440001';
 
 class PremiumService extends PremiumServiceImpl {
- constructor(dataSource: DataSource) {
+ constructor(dataSource: DataSource, dynamicPricing?: DynamicPricingService) {
   super(dataSource, {
    assignedAgencyForVehicle: vi.fn(async () => ({
     id:AGENCY,code:'TEST',name:'Agency',category:'showroom',city:'Test city',
     country:'France',address:'Test address',canPickup:true,canDropoff:true,
     enabled:true,timezone:'Europe/Paris',opensAt:'09:00',closesAt:'18:00',turnaroundMinutes:0,
    })),
-  } as unknown as LocationsService);
+  } as unknown as LocationsService, dynamicPricing);
  }
 }
 
@@ -248,5 +249,94 @@ describe('PremiumService review eligibility',()=>{
    reservationNumber:'RES-2026-000001',rating:5,title:'Great',comment:'Excellent vehicle indeed',
    serviceRating:4,serviceComment:'',
   } as never)).rejects.toThrow();
+ });
+
+ describe('Dynamic Pricing integration with quotation', () => {
+  const query = vi.fn(async (sql: string) => {
+   if (sql.includes('JOIN rental_locations')) return [{ id: AGENCY }];
+   if (sql.includes('FROM vehicles')) {
+    return [{
+     id: '550e8400-e29b-41d4-a716-446655440000',
+     daily_price: '500.00',
+     security_deposit: '5000.00',
+     category_name: 'Supercar',
+    }];
+   }
+   if (sql.includes('FROM rental_locations')) {
+    return [{
+     id: AGENCY, name: 'Agency', city: 'Test city', country: 'France', category: 'showroom',
+     pickup_fee: '0.00', dropoff_fee: '0.00', oneWayFee: '0.00', can_pickup: true, can_dropoff: true,
+    }];
+   }
+   if (sql.includes('FROM rental_fee_policy')) {
+    return [{ lateFeePerDay: '0.00', fuelFeePerPercent: '0.00', mileageAllowancePerDay: 200, excessMileageFee: '0.00' }];
+   }
+   return [];
+  });
+
+  it('keeps baseline quotation unchanged when dynamic pricing is disabled', async () => {
+   const mockDynamicPricing = {
+    isEnabled: vi.fn(() => false),
+    calculate: vi.fn(),
+   } as unknown as DynamicPricingService;
+
+   const service = new PremiumService({ query } as unknown as DataSource, mockDynamicPricing);
+   const quote = await service.quote({
+    vehicleId: '550e8400-e29b-41d4-a716-446655440000',
+    pickupDate: '2026-07-01',
+    returnDate: '2026-07-04',
+    pickupLocationId: AGENCY,
+   });
+
+   expect(mockDynamicPricing.calculate).not.toHaveBeenCalled();
+   expect(quote.dailyPrice).toBe('500.00');
+   expect(quote.rentalDays).toBe(3);
+   expect(quote.baseAmount).toBe('1500.00');
+   expect(quote.totalAmount).toBe('1500.00');
+   expect(quote.dynamicPricing).toBeUndefined();
+  });
+
+  it('applies dynamic pricing and returns breakdown when enabled', async () => {
+   const mockDynamicPricing = {
+    isEnabled: vi.fn(() => true),
+    calculate: vi.fn(async () => ({
+     effectiveDailyPriceCents: 57500,
+     baseAmountCents: 172500,
+     discountAmountCents: 8625,
+     durationDiscountCents: 8625,
+     promotionDiscountCents: 0,
+     breakdown: {
+      enabled: true,
+      baseDailyRate: '500.00',
+      effectiveDailyRate: '575.00',
+      averageFactor: 1.15,
+      adjustments: [
+       { code: 'SEASONAL_DEMAND', label: 'Summer Peak (+15%)', type: 'seasonal', percentage: 15, amount: '225.00' },
+      ],
+      durationDiscount: { tier: 'Extended Weekend Hire (3+ Days: -5%)', percentage: 5, amount: '86.25' },
+      taxes: { rate: 20, name: 'VAT (20% inclusive)', includedInTotal: true, amount: '273.13' },
+     },
+    })),
+   } as unknown as DynamicPricingService;
+
+   const service = new PremiumService({ query } as unknown as DataSource, mockDynamicPricing);
+   const quote = await service.quote({
+    vehicleId: '550e8400-e29b-41d4-a716-446655440000',
+    pickupDate: '2026-07-01',
+    returnDate: '2026-07-04',
+    pickupLocationId: AGENCY,
+   });
+
+   expect(mockDynamicPricing.calculate).toHaveBeenCalled();
+   expect(quote.dailyPrice).toBe('575.00');
+   expect(quote.rentalDays).toBe(3);
+   expect(quote.baseAmount).toBe('1725.00');
+   expect(quote.discountAmount).toBe('86.25');
+   expect(quote.totalAmount).toBe('1638.75');
+   expect(quote.dynamicPricing).toBeDefined();
+   expect(quote.dynamicPricing?.enabled).toBe(true);
+   expect(quote.dynamicPricing?.adjustments).toHaveLength(1);
+   expect(quote.terms[quote.terms.length - 1]).toContain('Dynamic seasonal rate');
+  });
  });
 });

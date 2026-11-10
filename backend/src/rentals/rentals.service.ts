@@ -194,7 +194,18 @@ export class RentalsService {
              r.reservation_number AS "reservationNumber",
              r.vehicle_id AS "vehicleId",
              CONCAT(b.name, ' ', m.name) AS "vehicleName",
+             b.name AS "brandName",
+             m.name AS "modelName",
              v.license_plate AS "licensePlate",
+             (SELECT vi.storage_path FROM vehicle_images vi WHERE vi.vehicle_id = v.id ORDER BY vi.is_primary DESC, vi.created_at ASC LIMIT 1) AS "imageUrl",
+             r.total_amount AS "totalAmount",
+             r.deposit_amount AS "depositAmount",
+             r.daily_price AS "dailyPrice",
+             r.rental_days AS "rentalDays",
+             CONCAT(u.first_name, ' ', u.last_name) AS "customerName",
+             u.email AS "customerEmail",
+             p.pickup_location_snapshot AS "pickupLocation",
+             p.dropoff_location_snapshot AS "dropoffLocation",
              l.status,
              l.started_at AS "startedAt",
              l.expected_return_at AS "expectedReturnAt",
@@ -207,9 +218,12 @@ export class RentalsService {
                'newReturnAt', e.new_return_at, 'createdAt', e.created_at
              ) ORDER BY e.created_at DESC), '[]'::json)
              FROM rental_extensions e WHERE e.rental_id = l.id) AS "extensions",
-             (l.status = 'active' AND l.expected_return_at < NOW()) AS "isOverdue"
+             (l.status = 'active' AND l.expected_return_at < NOW()) AS "isOverdue",
+             (SELECT inv.invoice_number FROM invoices inv WHERE inv.rental_id = l.id AND inv.status = 'issued' ORDER BY inv.issued_at DESC LIMIT 1) AS "invoiceNumber"
       FROM rentals l
       JOIN reservations r ON r.id = l.reservation_id
+      JOIN users u ON u.id = r.customer_id
+      LEFT JOIN reservation_preferences p ON p.reservation_id = r.id
       JOIN vehicles v ON v.id = r.vehicle_id
       JOIN vehicle_models m ON m.id = v.model_id
       JOIN brands b ON b.id = m.brand_id

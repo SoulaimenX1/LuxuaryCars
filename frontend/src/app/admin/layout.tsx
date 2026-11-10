@@ -1,5 +1,18 @@
 'use client';
 
+import {
+    BarChart3,
+    CalendarCheck,
+    Car,
+    CreditCard,
+    History as HistoryIcon,
+    Key,
+    LayoutDashboard,
+    RotateCcw,
+    ShieldCheck,
+    TrendingUp,
+    Users,
+} from 'lucide-react';
 import Link from 'next/link';
 import NotificationBell from '@/components/notification-bell';
 import { notifyAuthChanged } from '@/components/site-chrome';
@@ -55,41 +68,61 @@ const navigation = [
         href: '/admin',
         label: 'Dashboard',
         number: '01',
+        icon: LayoutDashboard,
     },
     {
         href: '/admin/vehicles',
         label: 'Fleet management',
         number: '02',
+        icon: Car,
     },
     {
         href: '/admin/customers',
         label: 'Customers',
         number: '03',
+        icon: Users,
     },
     {
         href: '/admin/reservations',
         label: 'Reservations',
         number: '04',
+        icon: CalendarCheck,
     },
     {
         href: '/admin/finance',
-        label: 'Payments',
+        label: 'Payments & Revenue',
         number: '05',
+        icon: CreditCard,
     },
     {
         href: '/admin/rentals',
         label: 'Active rentals',
         number: '06',
+        icon: Key,
     },
     {
         href: '/admin/returns',
         label: 'Returns & deposits',
         number: '07',
+        icon: RotateCcw,
     },
     {
         href: '/admin/history',
-        label: 'History',
+        label: 'History & Logs',
         number: '08',
+        icon: HistoryIcon,
+    },
+    {
+        href: '/admin/security',
+        label: 'Security & Passkeys',
+        number: '09',
+        icon: ShieldCheck,
+    },
+    {
+        href: '/admin/pricing',
+        label: 'Pricing & Intelligence',
+        number: '10',
+        icon: TrendingUp,
     },
 ];
 
@@ -112,7 +145,15 @@ export default function AdminLayout({
     const [loggingOut, setLoggingOut] =
         useState(false);
 
+    const [mobileNavOpen, setMobileNavOpen] =
+        useState(false);
+
     const toast = useToast();
+
+    // Auto-close mobile navigation drawer on route change
+    useEffect(() => {
+        setMobileNavOpen(false);
+    }, [pathname]);
 
     // ========================================================
     // VÉRIFIER LA SESSION ADMIN
@@ -166,9 +207,15 @@ export default function AdminLayout({
                 // --------------------------------------------------
 
                 if (
-                    authenticatedUser.role !== 'admin'
+                    authenticatedUser.role !== 'admin' &&
+                    authenticatedUser.role !== 'staff'
                 ) {
                     router.replace('/account');
+                    return;
+                }
+
+                if (authenticatedUser.role === 'staff' && pathname === '/admin') {
+                    router.replace('/admin/rentals');
                     return;
                 }
 
@@ -186,7 +233,7 @@ export default function AdminLayout({
         return () => {
             cancelled = true;
         };
-    }, [router]);
+    }, [router, pathname]);
 
     // ========================================================
     // DÉCONNEXION
@@ -229,6 +276,9 @@ export default function AdminLayout({
         if (href === '/admin') {
             return pathname === '/admin';
         }
+        if (href === '/admin/pricing' && (pathname.startsWith('/admin/pricing') || pathname.startsWith('/admin/analytics'))) {
+            return true;
+        }
 
         return pathname.startsWith(href);
     }
@@ -239,12 +289,12 @@ export default function AdminLayout({
 
     if (checkingSession) {
         return (
-            <div className={styles.sessionScreen}>
-                <div className={styles.sessionMark}>
+            <div className={styles.sessionScreen} suppressHydrationWarning>
+                <div className={styles.sessionMark} suppressHydrationWarning>
                     LC
                 </div>
 
-                <p>
+                <p suppressHydrationWarning>
                     Verifying administrator session
                 </p>
             </div>
@@ -256,77 +306,91 @@ export default function AdminLayout({
     // ========================================================
 
     return (
-        <div className={styles.shell}>
+        <div className={styles.shell} data-admin-portal="true" suppressHydrationWarning>
+
+            {/* MOBILE NAV OVERLAY */}
+            {mobileNavOpen && (
+                <div
+                    className={styles.mobileNavOverlay}
+                    onClick={() => setMobileNavOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
 
             {/* ================================================= */}
             {/* SIDEBAR ADMIN                                   */}
             {/* ================================================= */}
 
-            <aside className={styles.sidebar}>
+            <aside className={`${styles.sidebar} ${mobileNavOpen ? styles.sidebarOpen : ''}`}>
 
-                {/* LOGO */}
+                {/* HEADER FIXE SIDEBAR */}
+                <div className={styles.sidebarTop}>
+                    {/* LOGO OFFICIEL */}
+                    <div className={styles.identity}>
+                        <Link
+                            href="/admin"
+                            className={styles.logo}
+                            aria-label="Luxury Cars Admin Home"
+                        >
+                            LC
+                        </Link>
 
-                <div className={styles.identity}>
-                    <Link
-                        href="/admin"
-                        className={styles.logo}
-                    >
-                        LC
-                    </Link>
+                        <div>
+                            <strong>
+                                LUXURY CARS
+                            </strong>
 
-                    <div>
-                        <strong>
-                            LUXURY CARS
-                        </strong>
+                            <span>
+                                ADMINISTRATION
+                            </span>
+                        </div>
+                    </div>
 
+                    {/* TITRE WORKSPACE */}
+                    <div className={styles.workspace}>
                         <span>
-                            ADMINISTRATION
+                            {user?.role === 'staff' ? 'OPERATIONS' : 'PRIVATE OFFICE'}
                         </span>
+
+                        <h1>
+                            {user?.role === 'staff' ? 'Staff Portal' : 'Control Centre'}
+                        </h1>
                     </div>
                 </div>
 
-                {/* TITRE */}
-
-                <div className={styles.workspace}>
-                    <span>
-                        PRIVATE OFFICE
-                    </span>
-
-                    <h1>
-                        Control
-                        <br />
-                        centre
-                    </h1>
-                </div>
-
-                {/* NAVIGATION */}
-
-                <nav className={styles.navigation}>
-                    {navigation.map((item) => (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={
-                                isActive(item.href)
-                                    ? styles.activeLink
-                                    : styles.navLink
-                            }
-                        >
-                            <span
-                                className={styles.navNumber}
+                {/* NAVIGATION SCROLLABLE INDÉPENDANTE */}
+                <nav className={styles.navigation} aria-label="Admin Navigation">
+                    {(user?.role === 'staff'
+                        ? navigation.filter((item) =>
+                            ['/admin/reservations', '/admin/rentals', '/admin/returns', '/admin/security'].includes(item.href)
+                        )
+                        : navigation
+                    ).map((item) => {
+                        const Icon = item.icon;
+                        const active = isActive(item.href);
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={active ? styles.activeLink : styles.navLink}
                             >
-                                {item.number}
-                            </span>
+                                <span className={styles.navIconWrapper} aria-hidden="true">
+                                    <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
+                                </span>
 
-                            <span>
-                                {item.label}
-                            </span>
-                        </Link>
-                    ))}
+                                <span className={styles.navLabel}>
+                                    {item.label}
+                                </span>
+
+                                <span className={styles.navNumber}>
+                                    {item.number}
+                                </span>
+                            </Link>
+                        );
+                    })}
                 </nav>
 
-                {/* BAS DE SIDEBAR */}
-
+                {/* BAS DE SIDEBAR ANCRÉ SANS TRONCATURE */}
                 <div className={styles.sidebarFooter}>
 
                     <div className={styles.adminAccount}>
@@ -391,15 +455,33 @@ export default function AdminLayout({
 
             <section className={styles.main}>
 
-                {/* TOP BAR */}
-
+                {/* TOP BAR EXÉCUTIF */}
                 <div className={styles.topbar}>
-                    <div>
+                    <div className={styles.topbarLeft}>
+                        {/* Mobile Navigation Drawer Trigger */}
+                        <button
+                            type="button"
+                            className={styles.mobileNavToggle}
+                            onClick={() => setMobileNavOpen((prev) => !prev)}
+                            aria-label="Toggle navigation menu"
+                            aria-expanded={mobileNavOpen}
+                        >
+                            <span className={styles.hamburgerLine} />
+                            <span className={styles.hamburgerLine} />
+                            <span className={styles.hamburgerLine} />
+                        </button>
+
                         <span
                             className={styles.systemStatus}
                         >
                             <i />
                             SYSTEM ONLINE
+                        </span>
+
+                        <span className={styles.topbarDivider} aria-hidden="true" />
+
+                        <span className={styles.agencyBadge}>
+                            SINGLE AGENCY · BUDAPEST HQ
                         </span>
                     </div>
 
@@ -410,7 +492,7 @@ export default function AdminLayout({
 
                         <div className={styles.topbarRight}>
                             <span>
-                                ADMINISTRATOR
+                                {user?.role === 'staff' ? 'STAFF MEMBER' : 'EXECUTIVE ADMIN'}
                             </span>
 
                             <strong>

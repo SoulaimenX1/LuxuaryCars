@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import styles from './rentals.module.css';
 import { useToast } from '@/components/toast';
+import { describeActivation, requestAutoActivation } from '@/lib/auto-activate';
 
 interface Rental {
   id: string;
@@ -99,23 +100,34 @@ export default function AdminRentalsPage() {
     return reservations.filter((r) => r.status === 'confirmed');
   }, [reservations]);
 
-  // Trigger auto-activation
+  // Trigger auto-activation (admin-only backend operation).
+  // Success is shown ONLY after the backend confirms it; real errors are surfaced.
   async function handleAutoActivate() {
     setActivating(true);
     setError('');
     setSuccess('');
     try {
-      await fetch('/api/admin/reservations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'auto_activate' }),
-      }).catch(() => null);
+      const outcome = await requestAutoActivation((input, init) => fetch(input, init));
+      if (!outcome.ok) {
+        setError(outcome.message);
+        toast.error(outcome.message, 'Auto-Activation Failed');
+        return;
+      }
 
-      await refresh();
-      setSuccess('Rental start times synchronized.');
-      toast.success('Confirmed rentals synchronized with scheduled start times.', 'Auto-Activation');
-    } catch {
-      toast.info('Rentals synchronized.');
+      const message = describeActivation(outcome.activatedCount);
+      setSuccess(message);
+      if (outcome.activatedCount > 0) {
+        toast.success(message, 'Auto-Activation');
+      } else {
+        toast.info(message, 'Auto-Activation');
+      }
+
+      try {
+        await refresh();
+      } catch (err: unknown) {
+        // Activation itself succeeded; only the list reload failed.
+        setError(err instanceof Error ? err.message : 'Unable to reload rentals');
+      }
     } finally {
       setActivating(false);
     }
@@ -138,12 +150,8 @@ export default function AdminRentalsPage() {
       {/* Header */}
       <div className={styles.header}>
         <div>
-          <span className={styles.eyebrow}>LUXUAR · PRIVATE OFFICE · STAGE 06</span>
           <h1 className={styles.title}>Active Rentals</h1>
-          <p className={styles.subtitle}>
-            Monitor vehicles currently in customer custody. Confirmed reservations automatically activate at scheduled start time without complex handover forms.
-          </p>
-        </div>
+          </div>
 
         <button
           type="button"
@@ -214,7 +222,7 @@ export default function AdminRentalsPage() {
         </div>
       ) : filteredRentals.length === 0 ? (
         <div className={styles.emptyCard}>
-          <h2 style={{ fontFamily: 'var(--serif)', fontSize: '20px', color: 'var(--ink)' }}>
+          <h2 style={{ fontFamily: 'var(--admin-font-ui)', fontSize: '20px', color: 'var(--ink)' }}>
             No Active Rentals Found
           </h2>
           <p style={{ color: 'var(--muted)', fontSize: '13.5px', maxWidth: '480px', margin: '8px auto 0 auto' }}>
@@ -263,9 +271,6 @@ export default function AdminRentalsPage() {
               </div>
 
               <div className={styles.cardFooter}>
-                <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                  Vehicle in customer custody. No physical handover paperwork required.
-                </span>
                 <Link
                   href="/admin/returns"
                   className={styles.returnButton}

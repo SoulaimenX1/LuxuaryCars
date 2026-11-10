@@ -16,6 +16,7 @@ export interface PublicVehicleDto {
 
   // Informations commerciales.
   brandName: string;
+  brandLogoUrl?: string | null;
   modelName: string;
   categoryName: string;
 

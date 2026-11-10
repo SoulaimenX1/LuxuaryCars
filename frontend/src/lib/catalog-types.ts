@@ -26,6 +26,7 @@ export interface VehicleItem {
   description: string | null;
   modelName: string;
   brandName: string;
+  brandLogoUrl?: string | null;
   categoryName: string;
 
   // Caractéristiques éditoriales (facultatives).

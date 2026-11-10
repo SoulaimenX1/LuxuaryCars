@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { buildApiUrl } from '@/lib/api';
+import {
+    buildBffForwardedHeaders,
+    extractRetryAfterHeaders,
+    parseBackendJson,
+} from '@/lib/bff-headers';
 
 // ==========================================================
 // POST /api/auth/password-reset/confirm
@@ -18,17 +23,19 @@ export async function POST(request: Request) {
             buildApiUrl('/auth/password-reset/confirm'),
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: buildBffForwardedHeaders(request),
                 body: JSON.stringify(body),
                 cache: 'no-store',
             },
         );
 
-        const data = await backendResponse.json();
+        const data = await parseBackendJson(
+            backendResponse,
+            'Unable to reset password. Please try again.',
+        );
         return NextResponse.json(data, {
             status: backendResponse.status,
+            headers: extractRetryAfterHeaders(backendResponse),
         });
     } catch {
         return NextResponse.json(

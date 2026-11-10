@@ -56,7 +56,7 @@ export default function VehicleDetail(){
       }
     }catch(e){if(!controller.signal.aborted)setError(e instanceof Error?e.message:'Unable to load vehicle');}
     finally{if(!controller.signal.aborted)setLoading(false);}}
-    void load();return ()=>controller.abort();
+    void load();return ()=>{};
   },[id]);
 
   // Titre d'onglet propre à la voiture : le layout « /vehicles » impose

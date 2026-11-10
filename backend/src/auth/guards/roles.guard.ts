@@ -64,6 +64,17 @@ export class RolesGuard implements CanActivate {
             );
         }
 
+        // Feature-flagged mandatory MFA enforcement for privileged roles
+        if (
+            process.env.ENABLE_MANDATORY_ADMIN_MFA === 'true' &&
+            (requiredRoles.includes(UserRole.ADMIN) || requiredRoles.includes(UserRole.STAFF)) &&
+            !user.mfaVerified
+        ) {
+            throw new ForbiddenException(
+                'MFA verification required for administrative access',
+            );
+        }
+
         return true;
     }
 }

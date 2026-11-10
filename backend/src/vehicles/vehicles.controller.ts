@@ -88,8 +88,9 @@ export class VehiclesController {
 
     // Route publique.
     @Get('brands')
-    getBrands() {
-        return this.vehiclesService.findAllBrands();
+    getBrands(@Query('inFleet') inFleet?: string) {
+        const inFleetOnly = inFleet === 'true' || inFleet === '1';
+        return this.vehiclesService.findAllBrands({ inFleetOnly });
     }
 
     // ==========================================
@@ -180,6 +181,39 @@ export class VehiclesController {
             id,
             force === 'true',
         );
+    }
+
+    // ==========================================
+    // LOGO OFFICIEL DE MARQUE (UPLOAD / REMPLACE)
+    // ==========================================
+
+    @Post('brands/:id/logo')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    @UseInterceptors(
+        FileInterceptor('logo', {
+            limits: { fileSize: 5 * 1024 * 1024 },
+        }),
+    )
+    uploadBrandLogo(
+        @Param('id', ParseUUIDPipe) id: string,
+        @UploadedFile() file: UploadedImageFile | undefined,
+    ) {
+        if (!file) {
+            throw new BadRequestException('Logo file required in field "logo".');
+        }
+        return this.vehiclesService.uploadBrandLogo(id, file);
+    }
+
+    // ==========================================
+    // SUPPRIMER LE LOGO D'UNE MARQUE
+    // ==========================================
+
+    @Delete('brands/:id/logo')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)
+    deleteBrandLogo(@Param('id', ParseUUIDPipe) id: string) {
+        return this.vehiclesService.deleteBrandLogo(id);
     }
 
     // ==========================================

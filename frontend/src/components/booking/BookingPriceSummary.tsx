@@ -20,7 +20,9 @@ export default function BookingPriceSummary({
   loading: boolean;
   error: string;
 }) {
-  if (error) {
+  const isDatesRequiredMsg = /rental dates are required/i.test(error);
+
+  if (error && !isDatesRequiredMsg) {
     return (
       <p className={styles.error} role="alert">
         {error}
@@ -36,8 +38,17 @@ export default function BookingPriceSummary({
     );
   }
 
+  const isDynamic = Boolean(quote.dynamicPricing?.enabled);
+
   return (
     <div>
+      {isDynamic && (
+        <div className={styles.dynamicRateBadge}>
+          <span className={styles.dynamicRatePulse} />
+          <span>Dynamic Seasonal & Calendar Pricing Applied</span>
+        </div>
+      )}
+
       <table className={styles.priceTable}>
         <thead>
           <tr>
@@ -55,6 +66,14 @@ export default function BookingPriceSummary({
               <Price value={quote.baseAmount} />
             </td>
           </tr>
+
+          {isDynamic && quote.dynamicPricing?.adjustments?.map((adj) => (
+            <tr key={adj.code} className={styles.dynamicAdjustmentRow}>
+              <td>↳ {adj.label}</td>
+              <td>{adj.percentage > 0 ? `+${adj.percentage}%` : `${adj.percentage}%`}</td>
+            </tr>
+          ))}
+
           {quote.extras.map((extra) => (
             <tr key={extra.id}>
               <td>
@@ -65,7 +84,17 @@ export default function BookingPriceSummary({
               </td>
             </tr>
           ))}
-          {Number(quote.discountAmount) > 0 && (
+
+          {isDynamic && quote.dynamicPricing?.durationDiscount && (
+            <tr>
+              <td>Duration Privilege ({quote.dynamicPricing.durationDiscount.percentage}% off)</td>
+              <td>
+                −<Price value={quote.dynamicPricing.durationDiscount.amount} />
+              </td>
+            </tr>
+          )}
+
+          {Number(quote.discountAmount) > 0 && (!isDynamic || !quote.dynamicPricing?.durationDiscount) && (
             <tr>
               <td>Promotion {quote.promotionCode ? `(${quote.promotionCode})` : ''}</td>
               <td>
@@ -73,6 +102,16 @@ export default function BookingPriceSummary({
               </td>
             </tr>
           )}
+
+          {Number(quote.discountAmount) > 0 && isDynamic && quote.dynamicPricing?.durationDiscount && quote.promotionCode && (
+            <tr>
+              <td>Promotion Code ({quote.promotionCode})</td>
+              <td>
+                −<Price value={(Number(quote.discountAmount) - Number(quote.dynamicPricing.durationDiscount.amount)).toFixed(2)} />
+              </td>
+            </tr>
+          )}
+
           <tr className={styles.priceTotal}>
             <td>Rental total</td>
             <td>
@@ -81,6 +120,12 @@ export default function BookingPriceSummary({
           </tr>
         </tbody>
       </table>
+
+      {isDynamic && quote.dynamicPricing?.taxes && (
+        <p className={styles.taxNotice}>
+          Includes <Price value={quote.dynamicPricing.taxes.amount} /> {quote.dynamicPricing.taxes.name}
+        </p>
+      )}
 
       <div className={styles.depositBox}>
         <span>

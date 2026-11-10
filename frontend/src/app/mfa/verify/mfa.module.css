@@ -1,0 +1,312 @@
+/* ==============================================================
+   MFA VERIFICATION & RECOVERY — LUXURY CARS
+   Maison 2027 · Light & Dark Mode Aesthetic
+   ============================================================== */
+
+.page {
+  min-height: calc(100vh - 84px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(32px, 5vw, 64px) clamp(20px, 4vw, 40px);
+  background:
+    radial-gradient(110% 80% at 50% 10%, var(--card-glow, rgba(165, 134, 84, 0.08)) 0%, transparent 60%),
+    var(--ivory);
+  color: var(--ink);
+}
+
+.card {
+  position: relative;
+  width: min(100%, 460px);
+  padding: clamp(32px, 4vw, 48px);
+  border: 1px solid var(--panel-border, rgba(15, 15, 17, 0.12));
+  border-radius: var(--radius-card, 16px);
+  background: var(--panel-elevated, #fffefa);
+  box-shadow: var(--shadow-luxe, 0 20px 48px -12px rgba(15, 15, 17, 0.08));
+  animation: authRise 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold-text) 50%, transparent 100%);
+  opacity: 0.85;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-2);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.backLink:hover {
+  color: var(--champagne);
+  transform: translateX(-2px);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--champagne-line);
+  background: var(--champagne-soft);
+  color: var(--gold-text);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.title {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: clamp(24px, 2.5vw, 30px);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.title::after {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 1px;
+  margin-top: 14px;
+  background: var(--gold-rule-strong, rgba(176, 138, 62, 0.7));
+}
+
+.subtitle {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.userNotice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 10px 14px;
+  border-radius: var(--radius-field, 8px);
+  border: 1px solid var(--line-soft);
+  background: var(--ivory-2);
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.userNotice strong {
+  color: var(--gold-text);
+}
+
+.actionSection {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.passkeyBtn {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-radius: var(--radius-button, 8px);
+  border: 1px solid var(--champagne);
+  background: linear-gradient(135deg, var(--champagne-3) 0%, var(--champagne) 52%, var(--champagne-2) 100%);
+  color: var(--on-accent, #0d0d0f);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(179, 146, 90, 0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.passkeyBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(179, 146, 90, 0.35);
+}
+
+.passkeyBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 14px;
+}
+
+.dividerLine {
+  flex: 1;
+  height: 1px;
+  background: var(--line-soft);
+}
+
+.dividerText {
+  color: var(--muted-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.secondaryBtn {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--radius-button, 8px);
+  border: 1px solid var(--line);
+  background: var(--white);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.secondaryBtn:hover {
+  border-color: var(--champagne);
+  background: var(--champagne-soft);
+  color: var(--gold-text);
+}
+
+.recoveryForm {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field label {
+  color: var(--gold-text);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.field input {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field, 8px);
+  background: var(--ivory-2);
+  color: var(--ink);
+  font-family: var(--font-mono, monospace);
+  font-size: 15px;
+  letter-spacing: 0.15em;
+  text-align: center;
+  text-transform: uppercase;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--champagne);
+  background: var(--white);
+  box-shadow: 0 0 0 3px var(--champagne-soft);
+}
+
+.error {
+  padding: 12px 14px;
+  border-radius: var(--radius-field, 8px);
+  border: 1px solid var(--danger-line);
+  border-left-width: 3px;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes authRise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dark mode adjustments */
+:global(html[data-theme="dark"]) .card {
+  background: #18181c;
+  border-color: rgba(253, 250, 243, 0.12);
+  box-shadow: 0 24px 60px -15px rgba(0, 0, 0, 0.65);
+}
+
+:global(html[data-theme="dark"]) .userNotice {
+  background: #141417;
+  border-color: rgba(198, 164, 108, 0.22);
+}
+
+:global(html[data-theme="dark"]) .secondaryBtn {
+  background: #19191d;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #edeae4;
+}
+
+:global(html[data-theme="dark"]) .field input {
+  background: #141417;
+  border-color: rgba(198, 164, 108, 0.22);
+  color: var(--ink);
+}
+
+:global(html[data-theme="dark"]) .field input:focus {
+  background: #1a1a1f;
+}

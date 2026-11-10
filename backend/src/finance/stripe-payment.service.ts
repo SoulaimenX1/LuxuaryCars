@@ -522,18 +522,28 @@ export class StripePaymentService implements OnModuleInit, OnModuleDestroy {
                 [adminId, JSON.stringify({ notes: handoverNotes, confirmedAt: new Date().toISOString() }), reservation.id],
             );
 
-            // If mileage was optionally supplied, sync vehicle mileage and record inspection
-            if (rentalId && options?.mileageKm && options.mileageKm > 0) {
+            // Record baseline handover inspection so database triggers and return workflows succeed
+            if (rentalId) {
+                const vehicleRow = await manager.query(
+                    `SELECT mileage_km FROM vehicles WHERE id = $1::uuid`,
+                    [reservation.vehicle_id],
+                );
+                const baselineMileage =
+                    options?.mileageKm && options.mileageKm > 0
+                        ? options.mileageKm
+                        : Number(vehicleRow[0]?.mileage_km || 1000);
+                const baselineFuel = options?.fuelLevelPct ?? 100;
+
                 await manager.query(
                     `INSERT INTO inspections 
                        (rental_id, type, mileage_km, fuel_level_pct, overall_condition, notes, performed_by)
                      VALUES ($1::uuid, 'handover', $2, $3, 'excellent', $4, $5::uuid)
                      ON CONFLICT DO NOTHING`,
-                    [rentalId, options.mileageKm, options.fuelLevelPct ?? 100, handoverNotes, adminId],
+                    [rentalId, baselineMileage, baselineFuel, handoverNotes, adminId],
                 );
                 await manager.query(
                     `UPDATE vehicles SET mileage_km = $1 WHERE id = $2::uuid`,
-                    [options.mileageKm, reservation.vehicle_id],
+                    [baselineMileage, reservation.vehicle_id],
                 );
             }
 
@@ -757,8 +767,25 @@ export class StripePaymentService implements OnModuleInit, OnModuleDestroy {
         const adminRows = await this.dataSource.query(`SELECT id FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1`);
         const defaultAdminId = adminRows[0]?.id;
 
+        let activatedCount = 0;
         for (const res of toActivate) {
-            await this.dataSource.transaction(async (manager) => {
+            // The candidate scan above runs outside a transaction, so its row
+            // lock is released immediately. The periodic monitor and the admin
+            // "Auto-activate" action can therefore race on the same booking.
+            // Re-lock and re-check eligibility inside the transaction so each
+            // reservation is activated at most once and only while still valid.
+            const activated = await this.dataSource.transaction(async (manager) => {
+                const locked: { id: string }[] = await manager.query(
+                    `SELECT id FROM reservations
+                     WHERE id = $1::uuid
+                       AND status = 'confirmed'
+                       AND pickup_at <= now()
+                       AND return_at > now()
+                     FOR UPDATE SKIP LOCKED`,
+                    [res.id],
+                );
+                if (!locked[0]) return false;
+
                 const opener = defaultAdminId || res.customer_id;
                 await manager.query(
                     `INSERT INTO rentals 
@@ -782,10 +809,12 @@ export class StripePaymentService implements OnModuleInit, OnModuleDestroy {
                 if (updated && this.inboxService) {
                     await this.inboxService.reservationEvent('active_rental' as any, updated);
                 }
+                return true;
             });
+            if (activated) activatedCount += 1;
         }
 
-        return { activatedCount: toActivate.length };
+        return { activatedCount };
     }
 
     /**

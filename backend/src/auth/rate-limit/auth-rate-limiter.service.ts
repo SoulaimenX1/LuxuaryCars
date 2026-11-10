@@ -24,6 +24,7 @@ interface Bucket {
 @Injectable()
 export class AuthRateLimiter {
   private readonly buckets = new Map<string, Bucket>();
+  private static readonly MAX_BUCKETS_BEFORE_PRUNE = 10_000;
 
   consume(
     key: string,
@@ -35,6 +36,14 @@ export class AuthRateLimiter {
 
     // Fenêtre absente ou expirée : on démarre un nouveau compteur.
     if (!existing || existing.resetAt <= now) {
+      if (
+        !existing &&
+        this.buckets.size >=
+          AuthRateLimiter.MAX_BUCKETS_BEFORE_PRUNE
+      ) {
+        this.pruneExpired(now);
+      }
+
       this.buckets.set(key, {
         count: 1,
         resetAt: now + windowMs,
@@ -76,5 +85,13 @@ export class AuthRateLimiter {
   // Réinitialise tous les compteurs (tests / administration).
   reset(): void {
     this.buckets.clear();
+  }
+
+  private pruneExpired(now: number): void {
+    for (const [key, bucket] of this.buckets.entries()) {
+      if (bucket.resetAt <= now) {
+        this.buckets.delete(key);
+      }
+    }
   }
 }

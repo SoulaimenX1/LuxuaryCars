@@ -125,10 +125,12 @@ describe('AuthService', () => {
     });
 
     // ==========================================
-    // TEST 2: DUPLICATE EMAIL
+    // TEST 2: DUPLICATE EMAIL (SAFE MITIGATION — NO 409 LEAK)
     // ==========================================
 
-    it('should propagate duplicate-email errors', async () => {
+    it('should return an indistinguishable registration payload on duplicate email without leaking existing account metadata', async () => {
+        const existingUserId =
+            '11111111-2222-4333-8444-555555555555';
         const createCustomer = vi.fn(
             async (): Promise<User> => {
                 throw new ConflictException(
@@ -136,10 +138,20 @@ describe('AuthService', () => {
                 );
             },
         );
+        const findByEmail = vi.fn(async () => ({
+            id: existingUserId,
+            firstName: 'Real',
+            lastName: 'Owner',
+            email: registerDto.email,
+            role: UserRole.ADMIN,
+            status: AccountStatus.SUSPENDED,
+            emailVerifiedAt: new Date(),
+        })) as unknown as UsersService['findByEmail'];
 
         const service = new AuthService(
             {
                 createCustomer,
+                findByEmail,
             } as unknown as UsersService,
             {
                 signAsync: vi.fn(),
@@ -147,11 +159,15 @@ describe('AuthService', () => {
             inboxStub(),
         );
 
-        await expect(
-            service.register(registerDto),
-        ).rejects.toBeInstanceOf(
-            ConflictException,
-        );
+        const result = await service.register(registerDto);
+
+        expect(result.id).not.toBe(existingUserId);
+        expect(result.firstName).toBe(registerDto.firstName);
+        expect(result.lastName).toBe(registerDto.lastName);
+        expect(result.email).toBe(registerDto.email);
+        expect(result.role).toBe(UserRole.CUSTOMER);
+        expect(result.status).toBe(AccountStatus.ACTIVE);
+        expect(result.createdAt).toBeInstanceOf(Date);
     });
 
     // ==========================================
@@ -212,10 +228,14 @@ describe('AuthService', () => {
         );
 
         // Verify JWT payload
-        expect(signAsync).toHaveBeenCalledWith({
-            sub: user.id,
-            role: UserRole.CUSTOMER,
-        });
+        expect(signAsync).toHaveBeenCalledWith(
+            expect.objectContaining({
+                sub: user.id,
+                role: UserRole.CUSTOMER,
+                mfa_verified: false,
+                amr: ['pwd'],
+            }),
+        );
 
         // Verify that sensitive data is not returned
         expect(result).not.toHaveProperty(
@@ -511,6 +531,68 @@ describe('AuthService', () => {
             service.refreshTokens({ refreshToken: rawRefresh }),
         ).rejects.toBeInstanceOf(UnauthorizedException);
         expect(revokedAllForUser).toBe(true);
+    });
+
+    it('preserves mfa_verified=true and AMR during refresh token rotation for MFA-elevated sessions', async () => {
+        const rawMfaRefresh = 'rt_mfa_token_value_that_is_long_enough_for_validation';
+        const hashedRefresh = hashAuthToken(rawMfaRefresh);
+
+        const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+            if (sql.includes('FROM refresh_tokens rt')) {
+                if (params[0] === hashedRefresh) {
+                    return [
+                        {
+                            tokenId: 'rt-mfa-1',
+                            userId: 'admin-1',
+                            expiresAt: new Date(Date.now() + 86_400_000),
+                            revokedAt: null,
+                            userAgent: 'Chrome [mfa:webauthn]',
+                            firstName: 'Admin',
+                            lastName: 'Owner',
+                            email: 'admin@luxuar.hu',
+                            role: UserRole.ADMIN,
+                            status: AccountStatus.ACTIVE,
+                        },
+                    ];
+                }
+                return [];
+            }
+            if (sql.includes('UPDATE refresh_tokens')) {
+                return [];
+            }
+            if (sql.includes('INSERT INTO refresh_tokens')) {
+                return [];
+            }
+            return [];
+        });
+
+        const dataSource = {
+            query,
+            transaction: vi.fn(async (cb: (m: { query: typeof query }) => unknown) =>
+                cb({ query }),
+            ),
+        } as unknown as DataSource;
+
+        const signAsync = vi.fn().mockResolvedValue('mfa-rotated-access-token');
+        const service = new AuthService(
+            {} as unknown as UsersService,
+            { signAsync } as unknown as JwtService,
+            inboxStub(),
+            dataSource,
+        );
+
+        const rotated = await service.refreshTokens({
+            refreshToken: rawMfaRefresh,
+        });
+
+        expect(rotated.refreshToken.startsWith('rt_mfa_')).toBe(true);
+        expect(signAsync).toHaveBeenCalledWith({
+            sub: 'admin-1',
+            role: UserRole.ADMIN,
+            scope: 'authenticated',
+            mfa_verified: true,
+            amr: ['refresh', 'webauthn'],
+        });
     });
 
     // ==========================================
@@ -826,9 +908,193 @@ describe('AuthService', () => {
         expect(duplicateConfirm2.verified).toBe(true);
         expect(duplicateConfirm2.alreadyVerified).toBe(true);
 
-        // 6. Resend request for an already-verified account informs the user and does not dispatch another email
-        const resendAfterVerified = await service.requestEmailVerification({ email: 'charles@luxuar.hu' });
-        expect(resendAfterVerified.alreadyVerified).toBe(true);
+        // 6. Public resend request for an already-verified account returns indistinguishable generic response and does not dispatch another email
+        const publicResendAfterVerified = await service.requestEmailVerification({ email: 'charles@luxuar.hu' });
+        expect(publicResendAfterVerified).toEqual({
+            message: 'If that account exists and is unverified, a verification email has been sent.',
+        });
+        expect(publicResendAfterVerified.alreadyVerified).toBeUndefined();
         expect(capturedTokens).toHaveLength(2); // no new email sent!
+
+        // 7. Authenticated self-resend request for an already-verified account informs the user
+        const authResendAfterVerified = await service.requestEmailVerification(
+            { email: 'charles@luxuar.hu' },
+            { userId: user.id, email: user.email },
+        );
+        expect(authResendAfterVerified.alreadyVerified).toBe(true);
+        expect(capturedTokens).toHaveLength(2);
+    });
+
+    // ==========================================
+    // TEST 11: ACCOUNT ENUMERATION PROTECTION (P1)
+    // ==========================================
+
+    it('prevents account enumeration across email verification and password reset while preserving authenticated self-checks', async () => {
+        const unverifiedUser = {
+            id: 'user-unverified',
+            firstName: 'Unverified',
+            lastName: 'Member',
+            email: 'unverified@luxuar.hu',
+            role: UserRole.CUSTOMER,
+            status: AccountStatus.ACTIVE,
+            emailVerifiedAt: null,
+        } as User;
+
+        const verifiedUser = {
+            id: 'user-verified',
+            firstName: 'Verified',
+            lastName: 'Member',
+            email: 'verified@luxuar.hu',
+            role: UserRole.CUSTOMER,
+            status: AccountStatus.ACTIVE,
+            emailVerifiedAt: new Date('2026-11-01T10:00:00Z'),
+        } as User;
+
+        const suspendedUser = {
+            id: 'user-suspended',
+            firstName: 'Suspended',
+            lastName: 'Member',
+            email: 'suspended@luxuar.hu',
+            role: UserRole.CUSTOMER,
+            status: AccountStatus.SUSPENDED,
+            emailVerifiedAt: null,
+        } as User;
+
+        const usersByEmail = new Map<string, User>([
+            [unverifiedUser.email, unverifiedUser],
+            [verifiedUser.email, verifiedUser],
+            [suspendedUser.email, suspendedUser],
+        ]);
+        const usersById = new Map<string, User>([
+            [unverifiedUser.id, unverifiedUser],
+            [verifiedUser.id, verifiedUser],
+            [suspendedUser.id, suspendedUser],
+        ]);
+
+        const query = vi.fn(async (sql: string, params: unknown[] = []) => {
+            if (sql.includes('INSERT INTO one_time_tokens')) {
+                return [{ id: 'ott-enum-1', expiresAt: new Date(Date.now() + 300_000) }];
+            }
+            if (sql.includes('FROM one_time_tokens ott')) {
+                return [];
+            }
+            if (sql.includes('FROM users') && sql.includes('WHERE id = $1::uuid')) {
+                const u = usersById.get(String(params[0]));
+                if (!u) return [];
+                return [{ status: u.status, emailVerifiedAt: u.emailVerifiedAt }];
+            }
+            return [];
+        });
+
+        const dataSource = {
+            query,
+            transaction: vi.fn(async (cb: (m: { query: typeof query }) => unknown) =>
+                cb({ query }),
+            ),
+        } as unknown as DataSource;
+
+        const emailOutbox = {
+            safelyNotifyEmailVerification: vi.fn().mockResolvedValue(undefined),
+            safelyNotifyPasswordReset: vi.fn().mockResolvedValue(undefined),
+        } as unknown as EmailOutboxService;
+
+        const service = new AuthService(
+            {
+                findByEmail: vi.fn(async (email: string) =>
+                    usersByEmail.get(email.trim().toLowerCase()) ?? null,
+                ),
+                findById: vi.fn(async (id: string) => usersById.get(id) ?? null),
+            } as unknown as UsersService,
+            {
+                verifyAsync: vi.fn(async (token: string) => {
+                    if (token === 'jwt-verified-user') return { sub: verifiedUser.id };
+                    if (token === 'jwt-unverified-user') return { sub: unverifiedUser.id };
+                    throw new Error('invalid token');
+                }),
+            } as unknown as JwtService,
+            inboxStub(),
+            dataSource,
+            emailOutbox,
+        );
+
+        // 1. Public requestEmailVerification responses must be identical across all account states
+        const t0 = performance.now();
+        const resUnknown = await service.requestEmailVerification({ email: 'nobody@luxuar.hu' });
+        const dUnknown = performance.now() - t0;
+
+        const t1 = performance.now();
+        const resUnverified = await service.requestEmailVerification({ email: unverifiedUser.email });
+        const dUnverified = performance.now() - t1;
+
+        const t2 = performance.now();
+        const resVerified = await service.requestEmailVerification({ email: verifiedUser.email });
+        const dVerified = performance.now() - t2;
+
+        const resSuspended = await service.requestEmailVerification({ email: suspendedUser.email });
+
+        expect(resUnknown).toEqual(resUnverified);
+        expect(resVerified).toEqual(resUnverified);
+        expect(resSuspended).toEqual(resUnverified);
+        expect(resVerified.alreadyVerified).toBeUndefined();
+
+        // Timing floor applied across all public branches
+        expect(dUnknown).toBeGreaterThanOrEqual(40);
+        expect(dUnverified).toBeGreaterThanOrEqual(40);
+        expect(dVerified).toBeGreaterThanOrEqual(40);
+
+        // Authenticated as unverifiedUser probing verifiedUser's email must STILL get generic response
+        const crossUserProbe = await service.requestEmailVerification(
+            { email: verifiedUser.email },
+            { authorizationHeader: 'Bearer jwt-unverified-user' },
+        );
+        expect(crossUserProbe).toEqual(resUnknown);
+        expect(crossUserProbe.alreadyVerified).toBeUndefined();
+
+        // Authenticated as verifiedUser checking their own email gets alreadyVerified: true
+        const selfCheck = await service.requestEmailVerification(
+            { email: verifiedUser.email },
+            { authorizationHeader: 'Bearer jwt-verified-user' },
+        );
+        expect(selfCheck.alreadyVerified).toBe(true);
+
+        // 2. Public confirmEmailVerification with bogus token + verified email must NOT leak alreadyVerified
+        await expect(
+            service.confirmEmailVerification({
+                token: '0000000000000000000000000000000000000000000000000000000000000000',
+                email: verifiedUser.email,
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        // Cross-user authenticated confirm with bogus token + another user's verified email must also reject
+        await expect(
+            service.confirmEmailVerification(
+                {
+                    token: '0000000000000000000000000000000000000000000000000000000000000000',
+                    email: verifiedUser.email,
+                },
+                { authorizationHeader: 'Bearer jwt-unverified-user' },
+            ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+
+        // Self-authenticated confirm for already-verified user succeeds
+        const selfConfirm = await service.confirmEmailVerification(
+            {
+                token: '0000000000000000000000000000000000000000000000000000000000000000',
+                email: verifiedUser.email,
+            },
+            { authorizationHeader: 'Bearer jwt-verified-user' },
+        );
+        expect(selfConfirm.verified).toBe(true);
+        expect(selfConfirm.alreadyVerified).toBe(true);
+
+        // 3. Public requestPasswordReset responses must be identical across all account states
+        const pwUnknown = await service.requestPasswordReset({ email: 'nobody@luxuar.hu' });
+        const pwUnverified = await service.requestPasswordReset({ email: unverifiedUser.email });
+        const pwVerified = await service.requestPasswordReset({ email: verifiedUser.email });
+        const pwSuspended = await service.requestPasswordReset({ email: suspendedUser.email });
+
+        expect(pwUnknown).toEqual(pwUnverified);
+        expect(pwVerified).toEqual(pwUnverified);
+        expect(pwSuspended).toEqual(pwUnverified);
     });
 });

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { useToast } from '@/components/toast';
+import { PasskeyManager } from '@/components/passkeys/PasskeyManager';
 import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 
@@ -712,6 +713,8 @@ export default function CustomerProfilePage() {
 
                     </form>
                 )}
+
+                <PasskeyManager />
 
                 {/* ERREUR LORS DU CHARGEMENT */}
 

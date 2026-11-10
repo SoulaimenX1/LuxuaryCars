@@ -5,6 +5,11 @@ import {
 import {
     buildApiUrl,
 } from '@/lib/api';
+import {
+    buildBffForwardedHeaders,
+    extractRetryAfterHeaders,
+    parseBackendJson,
+} from '@/lib/bff-headers';
 
 // ==========================================================
 // TYPES
@@ -119,10 +124,9 @@ export async function POST(
                 {
                     method: 'POST',
 
-                    headers: {
-                        'Content-Type':
-                            'application/json',
-                    },
+                    headers: buildBffForwardedHeaders(
+                        request,
+                    ),
 
                     body:
                         JSON.stringify(
@@ -135,7 +139,10 @@ export async function POST(
             );
 
         const data =
-            await backendResponse.json();
+            await parseBackendJson(
+                backendResponse,
+                'Unable to complete registration.',
+            );
 
         // ------------------------------------------------------
         // CONSERVER LE CODE HTTP DU BACKEND
@@ -143,9 +150,9 @@ export async function POST(
         //
         // Exemples :
         //
-        // 201 : compte créé
+        // 201 : demande d'inscription acceptée
         // 400 : données invalides
-        // 409 : email déjà utilisé
+        // 429 : trop de tentatives (Retry-After)
         // ------------------------------------------------------
 
         return NextResponse.json(
@@ -153,6 +160,10 @@ export async function POST(
             {
                 status:
                     backendResponse.status,
+                headers:
+                    extractRetryAfterHeaders(
+                        backendResponse,
+                    ),
             },
         );
     } catch {

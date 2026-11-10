@@ -1,0 +1,1329 @@
+/* ==============================================================
+   LUXURY CARS — PREDICTIVE ANALYTICS STYLES (SIMPLIFIED & MINIMAL)
+   Strict: Zero horizontal scrollbars across all screen widths.
+   Theme-adaptive: Porcelaine (Ivory/White) & Obsidienne (Charcoal/Dark)
+   ============================================================== */
+
+.container {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 1.25rem 4rem;
+  color: var(--ink);
+  box-sizing: border-box;
+  overflow-x: hidden;
+  min-width: 0;
+}
+
+/* ==============================================================
+   1. TOP NAVIGATION & COMPACT HEADER
+   ============================================================== */
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  min-width: 0;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-text);
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.2s ease;
+}
+
+.backLink:hover {
+  opacity: 0.8;
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.managePricingLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--gold-text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-field, 4px);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.managePricingLink:hover {
+  background: var(--champagne-soft);
+  border-color: var(--gold-text);
+}
+
+.refreshBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.825rem;
+  font-weight: 600;
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-field, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.refreshBtn:hover {
+  border-color: var(--gold-text);
+  color: var(--gold-text);
+}
+
+.header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--serif, Georgia, serif);
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 0.35rem 0;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: var(--muted-text);
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* ==============================================================
+   2. THREE SUMMARY INDICATOR CARDS
+   ============================================================== */
+
+.indicatorsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 840px) {
+  .indicatorsGrid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+.indicatorCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.6rem;
+  min-width: 0;
+  box-shadow: var(--shadow-soft);
+  transition: border-color 0.2s ease;
+}
+
+.indicatorCard:hover {
+  border-color: var(--gold-text);
+}
+
+.indicatorTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.indicatorTitle {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+}
+
+.indicatorIconWrap {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--champagne-soft);
+  color: var(--gold-text);
+  flex-shrink: 0;
+}
+
+.indicatorValue {
+  font-family: var(--sans);
+  font-size: 1.85rem;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.indicatorSubtitle {
+  font-size: 0.825rem;
+  color: var(--muted-text);
+}
+
+/* ==============================================================
+   3. COMPACT INTERACTIVE DEMAND CHART
+   ============================================================== */
+
+.chartSection {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.5rem;
+  margin-bottom: 2.25rem;
+  box-shadow: var(--shadow-soft);
+  min-width: 0;
+}
+
+.chartHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.chartTitleGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chartTitle {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.chartSubtitle {
+  font-size: 0.825rem;
+  color: var(--muted-text);
+  margin: 0;
+}
+
+.horizonSelector {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--background);
+  padding: 0.25rem;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+
+.horizonBtn {
+  background: transparent;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 4px;
+  color: var(--muted-text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.horizonBtnActive {
+  background: var(--surface);
+  color: var(--gold-text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.chartDisplay {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.chartStatsRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.chartMainNumber {
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.chartRangeBadge {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gold-text);
+  background: var(--champagne-soft);
+  padding: 0.3rem 0.75rem;
+  border-radius: 4px;
+}
+
+/* Custom Interactive Progress / Range Bar */
+.rangeTrack {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background: var(--background);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.rangeFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(176, 138, 62, 0.25), rgba(176, 138, 62, 0.6));
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.rangeTargetLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gold-text);
+  box-shadow: 0 0 6px rgba(176, 138, 62, 0.8);
+}
+
+.chartLegend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted-text);
+}
+
+.chartAdviceRow {
+  background: var(--champagne-soft);
+  border-left: 3px solid var(--gold-text);
+  padding: 0.75rem 1rem;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.85rem;
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+/* ==============================================================
+   4. VEHICLE RECOMMENDATION CARDS
+   ============================================================== */
+
+.sectionHeadingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sectionTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.countPill {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--gold-text);
+  background: var(--champagne-soft);
+  padding: 0.2rem 0.55rem;
+  border-radius: 12px;
+}
+
+.recGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  min-width: 0;
+}
+
+.recCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+  min-width: 0;
+}
+
+.recCard:hover {
+  border-color: var(--gold-text);
+  transform: translateY(-2px);
+}
+
+.cardImageWrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0f0e0d;
+  overflow: hidden;
+}
+
+.vehicleImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cardBadgeTop {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(0, 0, 0, 0.75);
+  color: #f8f6f2;
+  padding: 0.25rem 0.6rem;
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+}
+
+.cardPlateBadge {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--gold-text);
+  padding: 0.25rem 0.55rem;
+  border-radius: 3px;
+}
+
+.cardBody {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: space-between;
+  gap: 1.1rem;
+}
+
+.cardVehicleTitle {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.3;
+}
+
+.priceComparisonRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--background);
+  border-radius: 4px;
+}
+
+.priceCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.priceLabelSmall {
+  font-size: 0.7rem;
+  color: var(--muted-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.currentPriceNum {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-decoration: line-through;
+}
+
+.recommendedPriceNum {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.shiftPill {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+}
+
+.shiftPositive {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.shiftNegative {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.confidenceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted-text);
+}
+
+.appliedStatusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 0.25rem 0.6rem;
+  border-radius: 3px;
+}
+
+.btnReviewCard {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--gold-text);
+  color: var(--gold-text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.btnReviewCard:hover {
+  background: var(--gold-text);
+  color: #111111;
+}
+
+/* ==============================================================
+   5. OPTIONAL COMPACT HISTORY SECTION
+   ============================================================== */
+
+.historySection {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.25rem 1.5rem;
+  margin-top: 2rem;
+  box-shadow: var(--shadow-soft);
+  min-width: 0;
+}
+
+.historyToggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--background);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.historyItemLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.historyThumb {
+  width: 48px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #0f0e0d;
+}
+
+.historyVehicleName {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.historyPlate {
+  font-family: monospace;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  margin-left: 0.4rem;
+}
+
+.historyItemRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.historyPriceBadge {
+  font-weight: 700;
+  color: var(--gold-text);
+}
+
+.btnRollbackSmall {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnRollbackSmall:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* ==============================================================
+   6. VEHICLE DETAILS DRAWER
+   ============================================================== */
+
+.drawerOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.drawer {
+  width: 100%;
+  max-width: 540px;
+  height: 100%;
+  background: var(--surface);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+  animation: slideLeft 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+  outline: none;
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.drawerHeaderInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.drawerTopRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.drawerCategoryBadge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gold-text);
+}
+
+.drawerPlatePill {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+
+.drawerTitle {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.drawerCloseBtn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted-text);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.drawerCloseBtn:hover {
+  border-color: var(--gold-text);
+  color: var(--gold-text);
+}
+
+.drawerBody {
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  flex: 1;
+}
+
+.drawerPhotoWrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0f0e0d;
+  border-radius: var(--radius-card, 6px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.drawerPhoto {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.drawerPhotoOverlay {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.drawerPhotoPlate {
+  font-family: monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--gold-text);
+  padding: 0.25rem 0.55rem;
+  border-radius: 3px;
+}
+
+.drawerPhotoStatus {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.75);
+  color: #f8f6f2;
+  padding: 0.25rem 0.55rem;
+  border-radius: 3px;
+}
+
+.drawerPriceComparison {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1rem;
+}
+
+.drawerPriceCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.drawerPriceLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-text);
+}
+
+.drawerPriceCurrent {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-decoration: line-through;
+}
+
+.drawerPriceTarget {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.drawerVariancePill {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.45rem;
+  border-radius: 3px;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.pillPositive {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.pillNegative {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.pillNeutral {
+  background: var(--champagne-soft);
+  color: var(--gold-text);
+}
+
+.drawerNoticeAmber,
+.drawerNoticeBlue {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-size: 0.825rem;
+  line-height: 1.45;
+}
+
+.drawerNoticeAmber {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: var(--ink);
+}
+
+.drawerNoticeAmber svg {
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.drawerNoticeBlue {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--ink);
+}
+
+.drawerNoticeBlue svg {
+  color: #10b981;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.drawerNoticeAmber p,
+.drawerNoticeBlue p {
+  margin: 0.2rem 0 0 0;
+  color: var(--muted-text);
+  font-size: 0.78rem;
+}
+
+.drawerCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.drawerCardTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gold-text);
+  margin: 0;
+}
+
+.drawerExplanationText {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0;
+}
+
+.drawerConfidenceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--muted-text);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.confidenceBadge {
+  color: var(--ink);
+}
+
+.confidenceBadge strong {
+  color: var(--gold-text);
+}
+
+.impactBadge {
+  color: var(--muted-text);
+}
+
+/* Price Simulation */
+.simInputRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+@media (max-width: 440px) {
+  .simInputRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+.simInputGroup,
+.simDurationGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.inputLabel {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-text);
+}
+
+.inputWithSymbol {
+  display: flex;
+  align-items: center;
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 0.6rem;
+}
+
+.inputWithSymbol span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gold-text);
+  margin-right: 0.4rem;
+}
+
+.simPriceField {
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  padding: 0.5rem 0;
+  outline: none;
+}
+
+.simDurationPills {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.simDurationBtn {
+  flex: 1;
+  background: var(--background);
+  border: 1px solid var(--line);
+  color: var(--muted-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.5rem 0.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.simDurationBtnActive {
+  border-color: var(--gold-text);
+  color: var(--gold-text);
+  background: var(--champagne-soft);
+}
+
+.simLoadingRow {
+  font-size: 0.8rem;
+  color: var(--muted-text);
+  padding: 0.5rem 0;
+}
+
+.simOutcomeCard {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.simOutcomeCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.simOutcomeLabel {
+  font-size: 0.68rem;
+  color: var(--muted-text);
+  text-transform: uppercase;
+}
+
+.simOutcomeValue {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+  font-weight: 600;
+}
+
+.simOutcomeSimulated {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.simDiffPositive {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.simDiffNegative {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+/* Dates */
+.datesGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.dateCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.dateField {
+  background: var(--background);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.85rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 4px;
+  outline: none;
+}
+
+.dateField:focus {
+  border-color: var(--gold-text);
+}
+
+/* Footer & Actions */
+.drawerFooter {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.drawerActionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.confirmBox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.confirmMessage {
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 0;
+}
+
+.confirmActionsRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.btnDismiss {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnDismiss:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.btnSecondary {
+  background: var(--background);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  border-color: var(--gold-text);
+}
+
+.btnPrimaryApply {
+  background: var(--gold-text);
+  border: 1px solid var(--gold-text);
+  color: #111111;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.65rem 1.25rem;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnPrimaryApply:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btnPrimaryApply:disabled,
+.btnDismiss:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Modals */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modalBox {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.modalTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.modalText {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.modalNotice {
+  background: var(--background);
+  border-left: 3px solid var(--gold-text);
+  padding: 0.75rem 1rem;
+  font-size: 0.825rem;
+  color: var(--ink);
+  border-radius: 0 4px 4px 0;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btnDanger {
+  background: #ef4444;
+  border: 1px solid #ef4444;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.65rem 1.15rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.btnDanger:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fieldLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-transform: uppercase;
+}
+
+.textInput {
+  background: var(--background);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.85rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 4px;
+  outline: none;
+}
+
+.textInput:focus {
+  border-color: var(--gold-text);
+}
+
+.simSpinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

@@ -79,5 +79,9 @@ import {
   providers: [
     VehiclesService,
   ],
+
+  exports: [
+    VehiclesService,
+  ],
 })
 export class VehiclesModule { }

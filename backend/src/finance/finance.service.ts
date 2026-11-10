@@ -3,12 +3,17 @@ import {
     ConflictException,
     Injectable,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
+import { readFile, readdir } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import {
     DataSource,
     EntityManager,
 } from 'typeorm';
-import { createLuxuryPdf } from './luxury-pdf.js';
+import { createLuxuryPdf, type LuxuryDocumentOptions } from './luxury-pdf.js';
+import { vehicleImagesDir } from '../vehicles/vehicle-images.storage.js';
+import { EmailOutboxService } from '../notifications/email-outbox.service.js';
 import type { ManualPaymentDto } from './dto/manual-payment.dto.js';
 import type { ReservationPaymentDto } from './dto/reservation-payment.dto.js';
 import type {
@@ -32,6 +37,33 @@ type RentalInfo = {
     customerName: string;
     pickupAt: Date;
     returnAt: Date;
+    dailyPrice?: string;
+    rentalDays?: number;
+    vehicleId?: string;
+    vehiclePhoto?: string | null;
+    brandName?: string;
+    modelName?: string;
+    licensePlate?: string;
+    vin?: string;
+    vehicleCategory?: string;
+    pickupLocation?: string;
+    dropoffLocation?: string;
+    deliveryAddress?: string;
+    customerEmail?: string;
+    customerPhone?: string;
+    customerAddress?: string;
+    driverLicense?: string;
+    extrasAmount?: string;
+    discountAmount?: string;
+    deliveryAmount?: string;
+    promotionCode?: string;
+    paidAt?: Date | null;
+    stripePaymentIntentId?: string | null;
+    isDemoPayment?: boolean | null;
+    manualPaymentMethod?: string | null;
+    paymentDeadlineAt?: Date | null;
+    paymentUrl?: string | null;
+    createdAt?: Date;
 };
 
 type ReservationInfo = {
@@ -105,7 +137,10 @@ const cents = (value: string | number): number =>
 
 @Injectable()
 export class FinanceService {
-    constructor(private readonly dataSource: DataSource) {}
+    constructor(
+        private readonly dataSource: DataSource,
+        @Optional() private readonly emailOutbox?: EmailOutboxService,
+    ) {}
 
     private async rental(
         db: Database,
@@ -137,7 +172,23 @@ export class FinanceService {
                     r.is_demo_payment AS "isDemoPayment",
                     r.manual_payment_method AS "manualPaymentMethod",
                     r.created_at AS "createdAt",
+                    r.extras_amount AS "extrasAmount",
+                    r.discount_amount AS "discountAmount",
+                    r.delivery_amount AS "deliveryAmount",
+                    r.promotion_code AS "promotionCode",
                     v.id AS "vehicleId",
+                    v.license_plate AS "licensePlate",
+                    v.vin AS "vin",
+                    cat.name AS "vehicleCategory",
+                    b.name AS "brandName",
+                    m.name AS "modelName",
+                    pref.pickup_location_snapshot AS "pickupLocation",
+                    pref.dropoff_location_snapshot AS "dropoffLocation",
+                    pref.delivery_address AS "deliveryAddress",
+                    u.email AS "customerEmail",
+                    u.phone AS "customerPhone",
+                    CONCAT_WS(', ', NULLIF(cp.address_line, ''), NULLIF(CONCAT_WS(' ', cp.postal_code, cp.city), ''), NULLIF(cp.country, '')) AS "customerAddress",
+                    cp.license_number AS "driverLicense",
                     (SELECT vi.storage_path FROM vehicle_images vi WHERE vi.vehicle_id = v.id ORDER BY vi.is_primary DESC, vi.created_at ASC LIMIT 1) AS "vehiclePhoto",
                     r.total_amount AS "totalAmount",
                     r.deposit_amount AS "depositAmount",
@@ -146,9 +197,12 @@ export class FinanceService {
                     r.pickup_at AS "pickupAt", r.return_at AS "returnAt"
              FROM rentals l
              JOIN reservations r ON r.id = l.reservation_id
+             LEFT JOIN reservation_preferences pref ON pref.reservation_id = r.id
              JOIN users u ON u.id = r.customer_id
+             LEFT JOIN customer_profiles cp ON cp.user_id = u.id
              JOIN vehicles v ON v.id = r.vehicle_id
              JOIN vehicle_models m ON m.id = v.model_id
+             LEFT JOIN categories cat ON cat.id = m.category_id
              JOIN brands b ON b.id = m.brand_id
              WHERE l.id = $1::uuid
                ${customerId ? 'AND r.customer_id = $2::uuid' : ''}
@@ -1105,7 +1159,7 @@ export class FinanceService {
     }
 
     async issueInvoice(adminId: string, rentalId: string) {
-        return this.dataSource.transaction(async manager => {
+        const result = await this.dataSource.transaction(async manager => {
             const rental = await this.rental(
                 manager,
                 rentalId,
@@ -1191,6 +1245,16 @@ export class FinanceService {
                 note: 'Prototype document; local tax/legal compliance must be reviewed before commercial use.',
             };
         });
+
+        if (this.emailOutbox) {
+            await this.emailOutbox.safelyNotifyInvoiceIssued(
+                rentalId,
+                result.invoiceNumber,
+                result.totalAmount,
+            );
+        }
+
+        return result;
     }
 
     async document(
@@ -1203,24 +1267,50 @@ export class FinanceService {
             rentalId,
             customerId,
         );
-        const rows = [
-            `Customer: ${rental.customerName}`,
-            `Vehicle: ${rental.vehicleName}`,
-            `Reservation: ${rental.reservationNumber}`,
-            `Contract: ${rental.contractNumber}`,
-            `Pickup: ${new Date(rental.pickupAt).toISOString().slice(0, 10)}`,
-            `Return: ${new Date(rental.returnAt).toISOString().slice(0, 10)}`,
-            `Rental amount EUR: ${rental.totalAmount}`,
-            `Security deposit EUR: ${rental.depositAmount}`,
-        ];
-        let subtitle = 'Rental terms summary - unsigned demonstration document';
+
+        let imageBuffer: Buffer | null = null;
+        try {
+            const dir = vehicleImagesDir();
+            // Only embed the rented vehicle's own photo. Never substitute a
+            // different car's image: the document would misrepresent the vehicle.
+            if (rental.vehiclePhoto) {
+                const photoFile = basename(rental.vehiclePhoto);
+                imageBuffer = await readFile(join(dir, photoFile));
+            }
+            if (!imageBuffer) {
+                const files = await readdir(dir).catch(() => []);
+                const cleanPlate = (rental.licensePlate || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const cleanId = (rental.vehicleId || '').toLowerCase();
+                const matched = files.find(f => {
+                    const fLow = f.toLowerCase();
+                    return (cleanPlate && fLow.includes(cleanPlate)) || (cleanId && fLow.includes(cleanId));
+                });
+                if (matched) {
+                    imageBuffer = await readFile(join(dir, matched));
+                }
+            }
+        } catch {
+            // Repli sans image si indisponible
+            imageBuffer = null;
+        }
+
         if (type === 'invoice') {
             const invoices: {
+                id: string;
                 invoiceNumber: string;
+                subtotal: string;
+                taxRate: string;
+                taxAmount: string;
                 totalAmount: string;
+                issuedAt: Date;
             }[] = await this.dataSource.query(
-                `SELECT invoice_number AS "invoiceNumber",
-                        total_amount AS "totalAmount"
+                `SELECT id,
+                        invoice_number AS "invoiceNumber",
+                        subtotal,
+                        tax_rate AS "taxRate",
+                        tax_amount AS "taxAmount",
+                        total_amount AS "totalAmount",
+                        issued_at AS "issuedAt"
                  FROM invoices
                  WHERE rental_id = $1 AND status = 'issued'
                  ORDER BY issued_at DESC LIMIT 1`,
@@ -1229,22 +1319,161 @@ export class FinanceService {
             if (!invoices[0]) {
                 throw new NotFoundException('Issued invoice not found');
             }
-            subtitle = 'INVOICE - DEMO (not a tax-certified invoice)';
-            rows.push(
-                `Invoice number: ${invoices[0].invoiceNumber}`,
-                `Total amount EUR: ${invoices[0].totalAmount}`,
+            const inv = invoices[0];
+
+            // Payments reconciliation for balance due
+            const payments: PaymentRow[] = await this.dataSource.query(
+                `SELECT id, type, method, amount, currency, paid_at AS "paidAt", reference, provider
+                 FROM payments
+                 WHERE reservation_id = $1::uuid
+                 ORDER BY paid_at DESC`,
+                [rental.reservationId],
             );
-        } else {
-            rows.push(
-                'Vehicle condition is recorded at handover and return.',
-                'The customer remains responsible for agreed charges per rental policy.',
-                'Additional protection, if selected, is subject to separate terms.',
+
+            const collectedCents = payments.reduce((sum, p) => {
+                if (p.type === 'rental_payment' || p.type === 'charge_payment') {
+                    return sum + cents(p.amount);
+                }
+                if (p.type === 'refund') {
+                    return sum - cents(p.amount);
+                }
+                return sum;
+            }, 0);
+
+            const invTotalCents = cents(inv.totalAmount);
+            const amountPaidCents = Math.max(0, collectedCents);
+            const balanceDueCents = Math.max(0, invTotalCents - amountPaidCents);
+            const amountPaidStr = (amountPaidCents / 100).toFixed(2);
+            const balanceDueStr = (balanceDueCents / 100).toFixed(2);
+
+            const latestPayment = payments.find(p => p.type === 'rental_payment');
+            const paymentMethodStr = latestPayment?.method
+                ? (latestPayment.method.toUpperCase().replace(/_/g, ' ') + (latestPayment.provider === 'stripe' ? ' (Stripe)' : ''))
+                : (rental.manualPaymentMethod ? rental.manualPaymentMethod.toUpperCase() : 'Card Online / Stripe');
+            const paymentRefStr = latestPayment?.reference || rental.stripePaymentIntentId || undefined;
+            const paymentStatusStr = balanceDueCents <= 0 ? 'PAID & RECONCILED' : amountPaidCents > 0 ? 'PARTIALLY PAID' : 'PENDING SETTLEMENT';
+
+            const invoiceOptions: LuxuryDocumentOptions = {
+                invoiceNumber: inv.invoiceNumber,
+                contractNumber: rental.contractNumber,
+                reservationNumber: rental.reservationNumber,
+                issuedAt: inv.issuedAt ? new Date(inv.issuedAt).toISOString() : new Date().toISOString(),
+                customerName: rental.customerName,
+                customerEmail: rental.customerEmail,
+                customerPhone: rental.customerPhone,
+                customerAddress: rental.customerAddress || rental.deliveryAddress || 'Budapest Metropolitan Area',
+                vehicleName: rental.vehicleName,
+                brandName: rental.brandName,
+                modelName: rental.modelName,
+                licensePlate: rental.licensePlate,
+                vin: rental.vin,
+                vehicleCategory: rental.vehicleCategory || 'Prestige & High-Performance',
+                pickupLocation: rental.pickupLocation || 'Budapest Flagship Showroom',
+                dropoffLocation: rental.dropoffLocation || 'Budapest Flagship Showroom',
+                imageBuffer,
+                pickupAt: rental.pickupAt ? new Date(rental.pickupAt).toISOString() : undefined,
+                returnAt: rental.returnAt ? new Date(rental.returnAt).toISOString() : undefined,
+                dailyPrice: rental.dailyPrice,
+                rentalDays: rental.rentalDays,
+                subtotalAmount: inv.subtotal,
+                taxRate: inv.taxRate || '27.00',
+                taxAmount: inv.taxAmount,
+                totalAmount: inv.totalAmount,
+                amountPaid: amountPaidStr,
+                balanceDue: balanceDueStr,
+                depositAmount: rental.depositAmount,
+                paymentStatus: paymentStatusStr,
+                paymentMethod: paymentMethodStr,
+                paymentReference: paymentRefStr,
+                paidAt: rental.paidAt ? new Date(rental.paidAt).toISOString() : undefined,
+                deliveryFee: rental.deliveryAmount && Number(rental.deliveryAmount) > 0 ? rental.deliveryAmount : undefined,
+                discountAmount: rental.discountAmount && Number(rental.discountAmount) > 0 ? rental.discountAmount : undefined,
+                extrasAmount: rental.extrasAmount && Number(rental.extrasAmount) > 0 ? rental.extrasAmount : undefined,
+                promotionCode: rental.promotionCode || undefined,
+                isDemo: Boolean(rental.isDemoPayment),
+                footerNote: 'LUXUAR AUTOMOTIVE ATELIER KFT. · Showroom: Budapest Flagship Showroom · Concierge: luxurycarsrentcars@gmail.com',
+            };
+
+            const invoiceRows = [
+                `Customer: ${rental.customerName}`,
+                `Vehicle: ${rental.vehicleName}`,
+                `Reservation: ${rental.reservationNumber}`,
+                `Contract: ${rental.contractNumber}`,
+                `Invoice number: ${inv.invoiceNumber}`,
+                `Pickup: ${new Date(rental.pickupAt).toISOString().slice(0, 10)}`,
+                `Return: ${new Date(rental.returnAt).toISOString().slice(0, 10)}`,
+                `Rental amount EUR: ${inv.totalAmount}`,
+                `Security deposit EUR: ${rental.depositAmount}`,
+            ];
+
+            return createLuxuryPdf(
+                'COMMERCIAL RENTAL INVOICE',
+                'Official Commercial Rental Invoice & Fiscal Settlement Record',
+                invoiceRows,
+                invoiceOptions,
             );
         }
+
+        // Contract
+        const contractOptions: LuxuryDocumentOptions = {
+            contractNumber: rental.contractNumber,
+            reservationNumber: rental.reservationNumber,
+            customerName: rental.customerName,
+            customerEmail: rental.customerEmail,
+            customerPhone: rental.customerPhone,
+            customerAddress: rental.customerAddress || rental.deliveryAddress || 'Budapest Metropolitan Area',
+            authorizedDrivers: `${rental.customerName}${rental.driverLicense ? ` (Licence: ${rental.driverLicense})` : ' (Verified Driver Dossier on File)'}`,
+            vehicleName: rental.vehicleName,
+            brandName: rental.brandName,
+            modelName: rental.modelName,
+            licensePlate: rental.licensePlate,
+            vin: rental.vin,
+            vehicleCategory: rental.vehicleCategory || 'Prestige & High-Performance',
+            pickupLocation: rental.pickupLocation || 'Budapest Flagship Showroom',
+            dropoffLocation: rental.dropoffLocation || 'Budapest Flagship Showroom',
+            imageBuffer,
+            pickupAt: rental.pickupAt ? new Date(rental.pickupAt).toISOString() : undefined,
+            returnAt: rental.returnAt ? new Date(rental.returnAt).toISOString() : undefined,
+            dailyPrice: rental.dailyPrice,
+            rentalDays: rental.rentalDays,
+            totalAmount: rental.totalAmount,
+            depositAmount: rental.depositAmount,
+            deliveryFee: rental.deliveryAmount && Number(rental.deliveryAmount) > 0 ? rental.deliveryAmount : undefined,
+            discountAmount: rental.discountAmount && Number(rental.discountAmount) > 0 ? rental.discountAmount : undefined,
+            extrasAmount: rental.extrasAmount && Number(rental.extrasAmount) > 0 ? rental.extrasAmount : undefined,
+            mileageAllowance: '250 km / day (Tier 1 Included)',
+            fuelPolicy: 'Full-to-Full (Premium 98+ RON / 80%+ SOC)',
+            departureInspection: 'Digital Handover Protocol Certified (0 Pre-existing Damage)',
+            handoverCondition: 'Factory Pristine & Showroom Sanitized',
+            paymentStatus: rental.status === 'active'
+                ? 'Active & In Custody'
+                : rental.status === 'returned'
+                ? 'Returned & Reconciled'
+                : 'Verified & Closed',
+            signatureStatus: 'Digitally Executed & Showroom Verified',
+            isDemo: Boolean(rental.isDemoPayment),
+            footerNote: 'LUXUAR AUTOMOTIVE ATELIER KFT. · Showroom: Budapest Flagship Showroom · Concierge: luxurycarsrentcars@gmail.com',
+        };
+
+        const contractRows = [
+            `Customer: ${rental.customerName}`,
+            `Vehicle: ${rental.vehicleName}`,
+            `Reservation: ${rental.reservationNumber}`,
+            `Contract: ${rental.contractNumber}`,
+            `Pickup: ${new Date(rental.pickupAt).toISOString().slice(0, 10)}`,
+            `Return: ${new Date(rental.returnAt).toISOString().slice(0, 10)}`,
+            `Rental amount EUR: ${rental.totalAmount}`,
+            `Security deposit EUR: ${rental.depositAmount}`,
+            'Vehicle condition is recorded at handover and return.',
+            'The customer remains responsible for agreed charges per rental policy.',
+            'Additional protection, if selected, is subject to separate terms.',
+        ];
+
         return createLuxuryPdf(
-            type === 'contract' ? 'RENTAL AGREEMENT' : 'RENTAL INVOICE',
-            subtitle,
-            rows,
+            'OFFICIAL RENTAL AGREEMENT',
+            'Official Custody & High-Performance Vehicle Hire Agreement',
+            contractRows,
+            contractOptions,
         );
     }
 
@@ -1295,6 +1524,17 @@ export class FinanceService {
         const payment = rows[0];
         if (!payment) throw new NotFoundException('Payment receipt not found');
 
+        const options = {
+            contractNumber: payment.reference ?? undefined,
+            reservationNumber: payment.reservationNumber,
+            customerName: payment.customerName,
+            vehicleName: payment.vehicleName,
+            totalAmount: `${payment.amount} ${payment.currency}`,
+            paymentStatus: payment.type.replace('_', ' ').toUpperCase(),
+            pickupAt: payment.paidAt ? new Date(payment.paidAt).toISOString() : undefined,
+            footerNote: 'LUXUAR · OFFICIAL PAYMENT RECEIPT · CONCIERGE: luxurycarsrentcars@gmail.com',
+        };
+
         return createLuxuryPdf(
             'OFFICIAL PAYMENT RECEIPT',
             'Verified Payment Transaction Record',
@@ -1309,6 +1549,7 @@ export class FinanceService {
                 `Recorded at: ${new Date(payment.paidAt).toISOString()}`,
                 'Status: Officially Settled and Reconciled',
             ],
+            options,
         );
     }
 

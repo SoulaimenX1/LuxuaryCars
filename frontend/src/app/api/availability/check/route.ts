@@ -1,4 +1,5 @@
 import { buildApiUrl } from '@/lib/api';
+import { recordVehicleInterval } from '@/lib/recent-booking-dates';
 import { NextResponse } from 'next/server';
 
 // ==========================================================
@@ -63,6 +64,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  recordVehicleInterval(vehicleId, pickupAt, returnAt);
 
   try {
     const response = await fetch(buildApiUrl('/availability/check'), {

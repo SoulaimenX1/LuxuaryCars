@@ -1334,19 +1334,25 @@ export class ReservationsAdminService {
                     return reservation;
                 }
 
-                // Seules les réservations confirmées ou rejetées
-                // peuvent être archivées. Les réservations encore
-                // en attente, annulées, expirées ou converties
-                // restent visibles dans la liste de travail.
+                // Seules les réservations terminées, confirmées, rejetées
+                // ou annulées peuvent être archivées. Les réservations encore
+                // en cours (pending, awaiting_payment, active_rental, converted)
+                // restent obligatoirement visibles dans la liste de travail.
+                const archivableStatuses = [
+                    ReservationStatus.CONFIRMED,
+                    ReservationStatus.REJECTED,
+                    ReservationStatus.COMPLETED,
+                    ReservationStatus.CANCELLED,
+                    ReservationStatus.CANCELLED_UNPAID,
+                    ReservationStatus.NO_SHOW,
+                ];
+
                 if (
                     archivedAt &&
-                    reservation.status !==
-                        ReservationStatus.CONFIRMED &&
-                    reservation.status !==
-                        ReservationStatus.REJECTED
+                    !archivableStatuses.includes(reservation.status)
                 ) {
                     throw new BadRequestException(
-                        'Only confirmed or rejected reservations can be archived',
+                        'Only confirmed, completed, rejected, or cancelled reservations can be archived',
                     );
                 }
 

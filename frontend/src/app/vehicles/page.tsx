@@ -251,18 +251,16 @@ export default function VehiclesPage() {
     // ========================================================
 
     useEffect(() => {
-        const controller = new AbortController();
+        let active = true;
 
         async function loadVehicles() {
             setLoading(true);
             setError('');
 
             try {
-                // Appeler notre route Next.js.
                 const response = await fetch('/api/vehicles/catalog', {
                     method: 'GET',
                     cache: 'no-store',
-                    signal: controller.signal,
                 });
 
                 if (!response.ok) {
@@ -271,29 +269,25 @@ export default function VehiclesPage() {
 
                 const data: unknown = await response.json();
 
-                // Le backend doit retourner un tableau.
                 if (!Array.isArray(data)) {
                     throw new Error('Invalid catalogue response.');
                 }
 
-                // Vérifier chaque véhicule.
                 const validVehicles = data.filter(isVehicle);
 
                 if (validVehicles.length !== data.length) {
                     throw new Error('Invalid vehicle data received.');
                 }
 
-                if (!controller.signal.aborted) {
+                if (active) {
                     setVehicles(validVehicles);
                 }
             } catch {
-                if (!controller.signal.aborted) {
-                    setError(
-                        'Unable to load vehicles. Please try again.',
-                    );
+                if (active) {
+                    setError('Unable to load vehicles. Please try again.');
                 }
             } finally {
-                if (!controller.signal.aborted) {
+                if (active) {
                     setLoading(false);
                 }
             }
@@ -301,39 +295,44 @@ export default function VehiclesPage() {
 
         void loadVehicles();
 
-        // Annuler la requête si la page est quittée.
         return () => {
-            controller.abort();
+            active = false;
         };
     }, [retryCount]);
 
     // Déterminer si le visiteur est un client connecté.
     // Les visiteurs sans compte ne voient aucun bouton « Save ».
-    useEffect(()=>{
-      const controller=new AbortController();
-      void fetch('/api/auth/session',{signal:controller.signal,cache:'no-store'})
-        .then(r=>r.ok?r.json():{user:null})
-        .then((data:{user?:{role?:string}|null})=>{
-          if(!controller.signal.aborted){
-            setIsCustomer(data.user?.role==='customer');
-            setIsAdminUser(data.user?.role==='admin'||data.user?.role==='staff');
+    useEffect(() => {
+      let active = true;
+      void fetch('/api/auth/session', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : { user: null }))
+        .then((data: { user?: { role?: string } | null }) => {
+          if (active) {
+            setIsCustomer(data.user?.role === 'customer');
+            setIsAdminUser(data.user?.role === 'admin' || data.user?.role === 'staff');
           }
         })
-        .catch(()=>{});
-      return ()=>controller.abort();
-    },[]);
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, []);
 
     // Les favoris sont conservés par compte côté PostgreSQL.
     // La liste n'est chargée que pour un client connecté.
-    useEffect(()=>{
-      if(!isCustomer) return;
-      const controller=new AbortController();
-      void fetch('/api/premium/me/favorites',{signal:controller.signal,cache:'no-store'})
-        .then(r=>r.ok?r.json():[])
-        .then((items:{vehicleId:string}[])=>{if(!controller.signal.aborted) setFavoriteIds(items.map(i=>i.vehicleId));})
-        .catch(()=>{});
-      return ()=>controller.abort();
-    },[isCustomer]);
+    useEffect(() => {
+      if (!isCustomer) return;
+      let active = true;
+      void fetch('/api/premium/me/favorites', { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : []))
+        .then((items: { vehicleId: string }[]) => {
+          if (active) setFavoriteIds(items.map((i) => i.vehicleId));
+        })
+        .catch(() => {});
+      return () => {
+        active = false;
+      };
+    }, [isCustomer]);
 
     // Anti double-clic : un seul appel réseau par véhicule à la fois,
     // pour éviter des enregistrements/suppressions contradictoires.
@@ -522,10 +521,6 @@ export default function VehiclesPage() {
 
                     <div className={styles.sectionHeading}>
                         <div>
-                            <span className={styles.eyebrow}>
-                                RECOMMENDED FOR YOU
-                            </span>
-
                             <h2>The fleet, curated</h2>
                         </div>
 

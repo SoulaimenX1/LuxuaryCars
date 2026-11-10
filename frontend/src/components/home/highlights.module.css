@@ -1,20 +1,20 @@
 /* ==========================================================
-   VITRINE DE L'ACCUEIL — LUXURY CARS
-   ==========================================================
-   Deux sélections : voitures les plus louées et éditions
-   limitées disponibles. Entièrement piloté par les jetons
-   de thème (clair / sombre).
+   HOMEPAGE SHOWCASE — LUXURY CARS (MAISON DESIGN SYSTEM)
+   Matches the exact typography of home.module.css and
+   vehicle-card.module.css:
+   - var(--serif) : Playfair Display (Section headings & vehicle model names)
+   - var(--sans)  : Plus Jakarta Sans (Eyebrows, brands, prices, badges, descriptions)
    ========================================================== */
 
 .highlights {
-  padding: clamp(64px, 9vw, 120px) 0;
+  padding: clamp(72px, 9vw, 120px) 0;
   background: var(--ivory-2);
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line-soft);
 }
 
 .container {
-  width: min(1240px, calc(100% - 48px));
+  width: min(calc(100% - 2 * var(--gutter)), var(--container));
   margin: 0 auto;
 }
 
@@ -23,7 +23,7 @@
 }
 
 /* ----------------------------------------------------------
-   EN-TÊTE DE SECTION
+   SECTION HEADER
    ---------------------------------------------------------- */
 
 .head {
@@ -32,44 +32,69 @@
 }
 
 .label {
-  margin-bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
   color: var(--gold-text);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 3px;
+  font-family: var(--sans);
+  font-size: var(--fs-label);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-eyebrow);
+  line-height: 1.4;
   text-transform: uppercase;
 }
 
+.label::before {
+  content: '';
+  width: 32px;
+  height: 1px;
+  flex-shrink: 0;
+  background: var(--gold-rule);
+}
+
 .head h2 {
+  margin-top: 16px;
   color: var(--ink);
   font-family: var(--serif);
-  font-size: clamp(30px, 3.6vw, 46px);
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.6px;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .head h2 em {
-  color: var(--champagne);
+  color: var(--gold-text);
   font-style: italic;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .head h2 em {
+    background-image: var(--gold-ink-strong);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
 }
 
 .lead {
   margin-top: 16px;
   max-width: 520px;
   color: var(--muted);
-  font-size: 15px;
-  line-height: 1.7;
+  font-family: var(--sans);
+  font-size: var(--fs-body-sm);
+  font-weight: var(--fw-regular);
+  line-height: var(--lh-relaxed);
+  letter-spacing: 0.005em;
 }
 
 /* ----------------------------------------------------------
-   GRILLE + CARTES
+   GRID & SHOWCASE CARDS
    ---------------------------------------------------------- */
 
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 22px;
+  gap: 24px;
 }
 
 .card {
@@ -79,19 +104,28 @@
   overflow: hidden;
   background: var(--surface-mirror);
   border: 1px solid var(--panel-border);
+  border-radius: var(--radius-card);
   box-shadow: inset 0 1px 0 var(--surface-highlight), var(--shadow-soft);
   text-decoration: none;
-  border-radius: var(--radius-card);
   transition:
     transform var(--dur-2) var(--ease-lux),
     border-color var(--dur-2) var(--ease-lux),
     box-shadow var(--dur-2) var(--ease-lux);
 }
 
-.card:hover {
-  transform: translateY(-4px);
-  border-color: var(--champagne);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .45), var(--mirror-glow), var(--shadow-luxe);
+.card::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  pointer-events: none;
+  background: var(--gold-rule);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .card::after {
@@ -108,6 +142,17 @@
   transition: opacity var(--dur-1) ease;
 }
 
+.card:hover {
+  transform: translateY(-4px);
+  border-color: var(--champagne);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), var(--mirror-glow), var(--shadow-haute);
+}
+
+.card:hover::before,
+.card:focus-visible::before {
+  transform: scaleX(1);
+}
+
 .card:hover::after {
   opacity: 1;
   animation: mirror-shimmer 1.1s var(--ease-lux);
@@ -117,11 +162,22 @@
   position: relative;
   aspect-ratio: 4 / 3;
   overflow: hidden;
+  border-bottom: 1px solid var(--line-soft);
   background:
     radial-gradient(
       140% 120% at 50% 2%,
       rgba(255, 255, 255, 0.5),
       rgba(255, 255, 255, 0) 58%
+    ),
+    var(--ivory-3);
+}
+
+:global(html[data-theme="dark"]) .media {
+  background:
+    radial-gradient(
+      130% 110% at 50% 5%,
+      rgba(204, 177, 129, 0.09) 0%,
+      rgba(0, 0, 0, 0) 65%
     ),
     var(--ivory-3);
 }
@@ -133,7 +189,7 @@
   box-sizing: border-box;
   object-fit: contain;
   filter: drop-shadow(0 18px 24px rgba(0, 0, 0, 0.28));
-  transition: transform 0.6s ease;
+  transition: transform 0.6s var(--ease-lux);
 }
 
 .card:hover .image {
@@ -143,49 +199,72 @@
 .imageFallback {
   width: 100%;
   height: 100%;
-  background:
-    linear-gradient(135deg, var(--ivory-3), var(--ivory-2));
+  background: linear-gradient(135deg, var(--ivory-3), var(--ivory-2));
 }
 
 .badge {
   position: absolute;
   top: 14px;
   left: 14px;
-  padding: 6px 11px;
+  padding: 5px 11px;
   background: rgba(16, 13, 10, 0.82);
   border: 1px solid var(--champagne-line);
+  border-radius: var(--radius-field);
   color: var(--champagne-3);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 1.4px;
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.1em;
+  line-height: 1.2;
   text-transform: uppercase;
   backdrop-filter: blur(6px);
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
 }
 
 /* ----------------------------------------------------------
-   CORPS DE CARTE
+   CARD BODY (Matches vehicle-card.module.css)
    ---------------------------------------------------------- */
 
 .body {
-  padding: 22px 22px 24px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 24px 26px 26px;
 }
 
 .brand {
-  color: var(--gold-text);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 2.4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--champagne-2);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.body h3 {
-  margin-top: 8px;
+:global(html[data-theme="dark"]) .brand {
+  color: var(--champagne);
+}
+
+.brand::before {
+  content: '';
+  width: 24px;
+  height: 1px;
+  flex-shrink: 0;
+  background: var(--champagne-line);
+}
+
+.body h3,
+.modelName {
+  margin-top: 10px;
   color: var(--ink);
   font-family: var(--serif);
-  font-size: clamp(20px, 2vw, 26px);
-  font-weight: 500;
-  letter-spacing: -0.4px;
+  font-size: 24px;
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .meta {
@@ -193,15 +272,21 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: auto;
   padding-top: 18px;
-  border-top: 1px solid var(--line-soft);
+  border-top: 1px solid var(--champagne-line);
 }
 
 .price {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 19px;
+  font-family: var(--sans);
+  font-size: 22px;
+  font-weight: var(--fw-bold);
+  letter-spacing: -0.02em;
+  line-height: 1;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -210,6 +295,8 @@
   color: var(--muted);
   font-family: var(--sans);
   font-size: 12px;
+  font-weight: var(--fw-medium);
+  letter-spacing: normal;
   white-space: nowrap;
 }
 
@@ -219,7 +306,9 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--line-strong);
+  border-radius: var(--radius-button);
   color: var(--ink);
+  font-family: var(--sans);
   font-size: 15px;
   transition:
     background 0.25s ease,
@@ -244,112 +333,22 @@
 }
 
 @media (max-width: 640px) {
-  .container {
-    width: min(1240px, calc(100% - 32px));
-  }
-
   .grid {
     grid-template-columns: 1fr;
   }
-}
 
+  .body {
+    padding: 20px 22px 22px;
+  }
 
-/* MAISON — Sélection de la maison, vitrine premium. */
-.head h2, .body h3 { font-family: var(--serif); font-weight: 400; }
-.card { border-radius: var(--radius-card); overflow: hidden; box-shadow: var(--shadow-soft); }
-.card:hover { box-shadow: var(--shadow); }
-
-/* ==============================================================
-   COUTURE 2026 — VITRINE DE L'ACCUEIL
-   ============================================================== */
-
-.label {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  letter-spacing: .26em;
-}
-
-.label::before {
-  content: '';
-  width: 30px;
-  height: 1px;
-  flex-shrink: 0;
-  background: var(--gold-rule);
-}
-
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .head h2 em {
-    background-image: var(--gold-ink);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  .body h3,
+  .modelName {
+    font-size: 22px;
   }
 }
 
-.card {
-  border-radius: var(--radius-card);
-  border-color: var(--panel-border);
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  z-index: 3;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  pointer-events: none;
-  background: var(--gold-rule);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform .55s cubic-bezier(.2, .7, .2, 1);
-}
-
-.card {
-  position: relative;
-}
-
-.card:hover::before {
-  transform: scaleX(1);
-}
-
-.card:hover {
-  box-shadow: var(--shadow-luxe);
-}
-
-.badge {
-  border-radius: var(--radius-field);
-}
-
-.arrow {
-  border-radius: var(--radius-button);
-}
-
-.meta {
-  border-top-color: var(--champagne-line);
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .card::before { transition: none !important; }
-}
-
-/* ==============================================================
-   HAUTE COUTURE 2026 — VITRINE DE L'ACCUEIL
-   ============================================================== */
-
-.label::before { width: 38px; }
-
-.card:hover { box-shadow: var(--shadow-haute); }
-
-.meta { border-top-color: var(--champagne-line); }
-
-@supports ((-webkit-background-clip: text) or (background-clip: text)) {
-  .head h2 em {
-    background-image: var(--gold-ink-strong);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  .card::before {
+    transition: none !important;
   }
 }

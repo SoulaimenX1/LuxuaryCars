@@ -151,8 +151,8 @@ export default function ReservationPaymentDetailPage() {
       }
       const data: FinancialSummary = await res.json();
       setSummary(data);
-      if (data.reservation?.customerName && !cardholderName) {
-        setCardholderName(data.reservation.customerName);
+      if (data.reservation?.customerName) {
+        setCardholderName((prev) => prev || data.reservation.customerName);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error loading payment details';
@@ -160,10 +160,13 @@ export default function ReservationPaymentDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [reservationNumber, router, cardholderName]);
+  }, [reservationNumber, router]);
 
   useEffect(() => {
-    void loadData();
+    const run = async () => {
+      await loadData();
+    };
+    void run();
   }, [loadData]);
 
   // Quick fill test card

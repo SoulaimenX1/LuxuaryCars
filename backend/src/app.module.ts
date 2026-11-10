@@ -1,7 +1,10 @@
 import { FinanceModule } from './finance/finance.module.js';
 import { ReturnsModule } from './returns/returns.module.js';
 import { PremiumModule } from './premium/premium.module.js';
+import { PricingModule } from './pricing/pricing.module.js';
 import { AdminCustomersModule } from './admin-customers/admin-customers.module.js';
+import { AdminSecurityModule } from './admin-security/admin-security.module.js';
+import { SettingsModule } from './settings/settings.module.js';
 import { RentalsModule } from './rentals/rentals.module.js';
 
 import {
@@ -173,10 +176,13 @@ import {
     // Démarrage et suivi des locations (Thesis 2).
     RentalsModule,
     PremiumModule,
+    PricingModule,
     ReturnsModule,
     FinanceModule,
 
     AdminCustomersModule,
+    AdminSecurityModule,
+    SettingsModule,
 
     // Activer les routes du tableau de bord.
     DashboardModule,

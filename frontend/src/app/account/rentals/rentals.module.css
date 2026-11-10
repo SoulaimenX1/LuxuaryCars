@@ -1,113 +1,1122 @@
-/* Suivi des locations personnelles — identité visuelle existante. */
-.page { min-height: 100vh; background: var(--ivory); color: var(--ink); }
-.container { width: min(calc(100% - 48px), 1100px); margin: 0 auto; padding: 60px 0 120px; }
-.back { color: var(--muted); font-size: 12px; }
-.eyebrow { color: var(--gold-text); font-size: 10px; font-weight: 700; letter-spacing: 2px; }
-.container h1 { margin: 18px 0; font-size: clamp(36px, 5vw, 60px); font-weight: 500; }
-.intro { color: var(--muted); line-height: 1.8; font-size: 14px; max-width: 680px; }
-.toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 34px 0; }
-.toolbar label { color: var(--gold-text); font-size: 12px; }
-.toolbar select { min-width: 180px; padding: 12px; background: var(--white); color: var(--ink); border: 1px solid var(--line); }
-.toolbar button, .expand { border: 1px solid var(--champagne); background: transparent; color: var(--gold-text); cursor: pointer; padding: 12px 16px; font-weight: 600; }
-.toolbar button:disabled { opacity: .5; cursor: default; }
-.error, .warning { border: 1px solid var(--danger-line); background: var(--danger-bg); color: var(--danger-text); padding: 16px; line-height: 1.5; }
-.list { display: grid; gap: 22px; }
-.card { padding: 30px; background: var(--white); border: 1px solid var(--line); }
-.cardHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
-.cardHead h2 { margin: 12px 0; font-size: 23px; font-weight: 500; overflow-wrap: anywhere; }
-.card h3 { margin: 16px 0 4px; font-size: 25px; font-weight: 500; }
-.plate { color: var(--muted); font-size: 13px; }
-.status, .overdue { display: inline-block; padding: 8px 12px; border: 1px solid var(--line); text-transform: uppercase; font-size: 10px; letter-spacing: 1px; }
-.overdue { color: var(--danger-text); border-color: var(--danger-line); }
-.details { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; margin: 26px 0 0; }
-.details dt { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
-.details dd { margin: 8px 0 0; font-size: 14px; overflow-wrap: anywhere; }
-.expand { width: 100%; margin-top: 24px; }
-.empty { border: 1px solid var(--line); background: var(--white); padding: 36px; line-height: 1.8; }
-.empty a { color: var(--gold-text); }
-@media (max-width: 600px) { .container { width: min(calc(100% - 30px), 1100px); } .card { padding: 22px; } .details { grid-template-columns: 1fr; } }
+/* ==============================================================
+   LUXUAR — MY RENTALS & VEHICLE CUSTODY PORTFOLIO
+   Obsidian & Champagne Gold Aesthetic · Maison Atelier Grade
+   ============================================================== */
 
-/* Dates de prolongation communiquées au client. */
-.extensionHistory { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 15px; }
-.extensionHistory strong { display: block; font-size: 12px; }
-.extensionHistory p { margin-top: 9px; font-size: 12px; color: var(--muted); }
+.page {
+  min-height: 100vh;
+  background: var(--background);
+  color: var(--text);
+  padding-bottom: 120px;
+}
 
-
-/* MAISON — Historique des locations. */
-.page h1 { font-family: var(--serif); letter-spacing: -.04em; }
-.card, .empty { border-radius: var(--radius-card); box-shadow: var(--shadow-soft); }
-.toolbar input, .toolbar select, .expand { border-radius: var(--radius-field); }
-.card { background: var(--white); }
-
-.documentLinks{display:flex;flex-wrap:wrap;gap:18px;margin:16px 0;}
-.documentLinks a{font-size:13px;text-decoration:underline;text-underline-offset:3px;color:var(--gold-text);}
-.documentLinks a:focus-visible{outline:2px solid var(--focus-ring);outline-offset:3px;}
+.container {
+  width: min(calc(100% - 48px), 1280px);
+  margin: 0 auto;
+  padding-top: 40px;
+}
 
 /* ==============================================================
-   COUTURE 2026 — MES LOCATIONS
+   TOP NAVIGATION & BREADCRUMB
    ============================================================== */
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 32px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.backLink:hover {
+  color: var(--champagne);
+  transform: translateX(-3px);
+}
+
+.topActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.reservationsCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  background: rgba(196, 167, 117, 0.08);
+  color: var(--champagne);
+  border: 1px solid rgba(196, 167, 117, 0.3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--radius-button);
+  text-decoration: none;
+  transition: all var(--dur-2) var(--ease-lux);
+}
+
+.reservationsCta:hover {
+  background: rgba(196, 167, 117, 0.16);
+  border-color: var(--champagne);
+  box-shadow: 0 4px 16px -4px var(--card-glow);
+  transform: translateY(-1px);
+}
+
+.refreshButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  color: var(--muted-text);
+  cursor: pointer;
+  transition: all var(--dur-2) var(--ease-lux);
+}
+
+.refreshButton:hover:not(:disabled) {
+  color: var(--champagne);
+  border-color: var(--champagne);
+  transform: rotate(180deg);
+}
+
+.refreshButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ==============================================================
+   PAGE HEADER
+   ============================================================== */
+
+.header {
+  margin-bottom: 40px;
+}
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
-  letter-spacing: .24em;
+  gap: 8px;
+  font-family: var(--font-cinzel), serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--gold-text);
+  text-transform: uppercase;
+  margin-bottom: 12px;
 }
 
-.eyebrow::before {
-  content: '';
-  width: 30px;
-  height: 1px;
-  background: var(--gold-rule);
+.title {
+  font-family: var(--font-playfair), serif;
+  font-size: clamp(32px, 4.5vw, 48px);
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin: 0 0 14px 0;
 }
 
-.container h1 {
-  font-family: var(--serif);
-  letter-spacing: -.04em;
+.subtitle {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--muted-text);
+  max-width: 720px;
+  margin: 0;
+}
+
+/* ==============================================================
+   STATUS FILTER CARDS
+   ============================================================== */
+
+.statusOverview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.statusCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 98px;
+  padding: 18px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--dur-2) var(--ease-lux);
+  overflow: hidden;
+}
+
+.statusCard::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 3px;
+  background: transparent;
+  transition: background var(--dur-2) var(--ease-lux);
+}
+
+.statusCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.12);
+}
+
+.statusCard.active {
+  background: var(--surface-highlight);
+  border-color: var(--champagne);
+  box-shadow: 0 10px 30px -8px var(--card-glow);
+}
+
+.statusCard.active::after {
+  background: var(--champagne);
+}
+
+.statusCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.statusCardLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--muted-text);
+  text-transform: uppercase;
+}
+
+.statusCard.active .statusCardLabel {
+  color: var(--gold-text);
+}
+
+.statusCardIcon {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.statusCardCount {
+  font-family: var(--font-cinzel), serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1;
+}
+
+.statusPulsingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+  animation: pulseGold 2s infinite;
+}
+
+@keyframes pulseGold {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+}
+
+.goldText {
+  color: var(--champagne) !important;
+}
+
+.emeraldText {
+  color: #10b981 !important;
+}
+
+/* ==============================================================
+   TOOLBAR & SEARCH
+   ============================================================== */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
+  margin-bottom: 32px;
+}
+
+.searchBox {
+  position: relative;
+  flex: 1;
+  min-width: 280px;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  height: 42px;
+  padding: 0 40px 0 42px;
+  background: var(--background);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field);
+  color: var(--ink);
+  font-size: 13.5px;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--champagne);
+  box-shadow: 0 0 0 3px var(--champagne-soft);
+}
+
+.clearSearch {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.toolbarMeta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--muted-text);
+}
+
+/* ==============================================================
+   LOADING & EMPTY STATES
+   ============================================================== */
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 0;
+  gap: 18px;
+}
+
+.loadingSpinner {
+  width: 36px;
+  height: 36px;
+  border: 2px solid rgba(196, 167, 117, 0.2);
+  border-top-color: var(--champagne);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingText {
+  color: var(--muted-text);
+  font-size: 14px;
+  letter-spacing: 0.05em;
+}
+
+.emptyCard {
+  text-align: center;
+  padding: 80px 24px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.emptyIconCircle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(196, 167, 117, 0.08);
+  border: 1px solid rgba(196, 167, 117, 0.25);
+  margin-bottom: 24px;
+}
+
+.emptyIcon {
+  color: var(--champagne);
+}
+
+.emptyTitle {
+  font-family: var(--font-playfair), serif;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 0 0 12px 0;
+}
+
+.emptyText {
+  font-size: 14.5px;
+  color: var(--muted-text);
+  max-width: 520px;
+  margin: 0 auto 30px;
+  line-height: 1.65;
+}
+
+.emptyCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 28px;
+  background: var(--ink);
+  color: var(--ivory);
+  border: 1px solid var(--champagne);
+  border-radius: var(--radius-button);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--dur-2) var(--ease-lux);
+}
+
+.emptyCta:hover {
+  background: var(--surface-highlight);
+  color: var(--champagne);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px -4px var(--card-glow);
+}
+
+/* ==============================================================
+   RENTALS LIST & BESPOKE CARDS
+   ============================================================== */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
 }
 
 .card {
   position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-card);
-  border-color: var(--panel-border);
-  overflow: hidden;
-}
-
-.card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--gold-rule);
-}
-
-.cardHead h2,
-.card h3 {
-  font-family: var(--serif);
-}
-
-.status,
-.overdue {
-  border-radius: var(--radius-field);
-  letter-spacing: .14em;
-}
-
-.overdue {
-  background: var(--danger-bg);
-}
-
-.toolbar select {
-  border-radius: var(--radius-field);
-}
-
-.toolbar button,
-.expand {
-  border-radius: var(--radius-button);
-}
-
-.empty {
-  border-radius: var(--radius-card);
-  border-color: var(--panel-border);
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  transition: all var(--dur-2) var(--ease-lux);
+}
+
+.card:hover {
+  border-color: rgba(196, 167, 117, 0.4);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.2);
+}
+
+.cardMain {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+}
+
+@media (max-width: 1024px) {
+  .cardMain {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Vehicle Media Box (Left column) */
+.cardMedia {
+  position: relative;
+  min-height: 290px;
+  background: #090a0d;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 22px;
+}
+
+.vehicleImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--dur-3) var(--ease-lux);
+}
+
+.card:hover .vehicleImage {
+  transform: scale(1.05);
+}
+
+.imageFallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0d0e12;
+}
+
+.imageOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(9, 10, 13, 0.5) 0%,
+    rgba(9, 10, 13, 0.2) 40%,
+    rgba(9, 10, 13, 0.9) 100%
+  );
+  pointer-events: none;
+}
+
+.mediaTop {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contractBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(196, 167, 117, 0.35);
+  border-radius: var(--radius-pill);
+  color: #f6f1e8;
+  font-family: var(--font-cinzel), monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.contractBadge:hover {
+  border-color: var(--champagne);
+  color: var(--champagne);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(8px);
+}
+
+.status_active {
+  background: rgba(196, 167, 117, 0.15);
+  border: 1px solid rgba(196, 167, 117, 0.5);
+  color: var(--champagne);
+}
+
+.status_returned {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.status_closed {
+  background: rgba(148, 163, 184, 0.15);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #94a3b8;
+}
+
+.statusOverdue {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+}
+
+.pulsingDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--champagne);
+  box-shadow: 0 0 0 0 rgba(196, 167, 117, 0.7);
+  animation: pulseGold 2s infinite;
+}
+
+.mediaBottom {
+  position: relative;
+  z-index: 2;
+}
+
+.vehicleBrand {
+  font-family: var(--font-cinzel), serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--champagne);
+  text-transform: uppercase;
+  margin: 0 0 4px 0;
+}
+
+.vehicleModel {
+  font-family: var(--font-playfair), serif;
+  font-size: 24px;
+  font-weight: 500;
+  color: #ffffff;
+  margin: 0 0 10px 0;
+  line-height: 1.2;
+}
+
+.plateRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.platePill {
+  display: inline-block;
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+}
+
+.invoicePill {
+  display: inline-block;
+  font-family: monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--champagne);
+  background: rgba(196, 167, 117, 0.1);
+  border: 1px solid rgba(196, 167, 117, 0.3);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+}
+
+/* Right Content Column */
+.cardContent {
+  padding: 28px 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.cardContentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.refMetaGroup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.refPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  background: var(--surface-highlight);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.refPill:hover {
+  border-color: var(--champagne);
+  color: var(--champagne);
+}
+
+.custodyTag {
+  font-size: 12px;
+  color: var(--muted-text);
+  letter-spacing: 0.02em;
+}
+
+.contractIdTag {
+  font-size: 11.5px;
+  color: var(--muted-text);
+  font-family: monospace;
+}
+
+/* Stepper */
+.stepperContainer {
+  margin: 4px 0 12px 0;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 0 12px;
+}
+
+.stepper::before {
+  content: "";
+  position: absolute;
+  top: 13px;
+  left: 24px;
+  right: 24px;
+  height: 2px;
+  background: var(--line-soft);
+  z-index: 1;
+}
+
+.stepItem {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  flex: 1;
+}
+
+.stepDot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  transition: all var(--dur-2) var(--ease-lux);
+}
+
+.stepLabel {
+  font-size: 11px;
+  color: var(--muted-text);
+  letter-spacing: 0.02em;
+}
+
+.stepItem.completed .stepDot {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.stepItem.completed .stepLabel {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.stepItem.current .stepDot {
+  background: var(--champagne);
+  border-color: var(--champagne);
+  color: #070709;
+  box-shadow: 0 0 0 4px var(--champagne-soft);
+}
+
+.stepItem.current .stepLabel {
+  color: var(--gold-text);
+  font-weight: 700;
+}
+
+/* Logistics Info Grid */
+.infoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field);
+  padding: 16px 20px;
+}
+
+.infoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.infoLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+}
+
+.infoValue {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.infoSub {
+  font-size: 12px;
+  color: var(--muted-text);
+}
+
+/* Financial & Security Ledger Summary */
+.financialRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--surface-highlight);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field);
+}
+
+.financialItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.financialLabel {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+}
+
+.financialAmount {
+  font-family: var(--font-cinzel), serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.financialDeposit {
+  font-family: var(--font-cinzel), serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--champagne);
+}
+
+.financialStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Overdue Warning Banner */
+.overdueAlert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: var(--radius-field);
+  color: #ef4444;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Actions Row */
+.actionsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.actionButtonsGroup {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.primaryPdfButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px;
+  background: var(--ink);
+  color: var(--ivory);
+  border: 1px solid var(--champagne);
+  border-radius: var(--radius-button);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--dur-2) var(--ease-lux);
+}
+
+.primaryPdfButton:hover {
+  background: var(--surface-highlight);
+  color: var(--champagne);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px -4px var(--card-glow);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.secondaryButton:hover {
+  background: var(--surface-highlight);
+  border-color: var(--champagne);
+  color: var(--champagne);
+}
+
+.invoiceButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  background: rgba(196, 167, 117, 0.08);
+  color: var(--champagne);
+  border: 1px solid rgba(196, 167, 117, 0.35);
+  border-radius: var(--radius-button);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.invoiceButton:hover {
+  background: rgba(196, 167, 117, 0.18);
+  border-color: var(--champagne);
+  transform: translateY(-1px);
+}
+
+.metricsToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 16px;
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-button);
+  color: var(--muted-text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.metricsToggle:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+/* Expandable Drawer */
+.detailsDrawer {
+  margin-top: 16px;
+  padding: 22px;
+  background: var(--background);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field);
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.drawerHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-cinzel), serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--gold-text);
+  text-transform: uppercase;
+  margin: 0 0 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.inspectionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.inspectionMetricCard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field);
+}
+
+.metricLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metricValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.metricSub {
+  font-size: 11px;
+  color: var(--muted-text);
+}
+
+.extensionBox {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-field);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.extensionTitle {
+  font-size: 12px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+
+.extensionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted-text);
+}
+
+.conciergeHotline {
+  margin-top: 18px;
+  padding: 12px 16px;
+  background: rgba(196, 167, 117, 0.06);
+  border: 1px solid rgba(196, 167, 117, 0.2);
+  border-radius: var(--radius-field);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.errorBanner {
+  padding: 16px 20px;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-line);
+  color: var(--danger-text);
+  border-radius: var(--radius-field);
+  font-size: 14px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+
+/* ==============================================================
+   PHASE 9B: ULTRA-LUXURY RESPONSIVE REFINEMENT (ZERO H-OVERFLOW)
+   ============================================================== */
+
+@media (max-width: 640px) {
+  .searchBox {
+    min-width: 0 !important;
+    width: 100%;
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sortBox {
+    width: 100%;
+  }
+  .sortSelect {
+    width: 100%;
+  }
 }

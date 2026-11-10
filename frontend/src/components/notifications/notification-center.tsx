@@ -116,11 +116,14 @@ export default function NotificationCenter({ variant = 'default' }: { variant?: 
       {preferences ? <>
         {([
           ['bookingUpdates','Booking updates'], ['rentalReminders','Pick-up and drop-off reminders'],
-          ['fleetNews','Fleet announcements'], ['emailEnabled','Email notifications (not yet connected)'],
+          ['fleetNews','Fleet announcements'], ['emailEnabled','Transactional email notifications (Active)'],
         ] as const).map(([key,label]) => <label key={key}>
-          <input type="checkbox" checked={preferences[key]} disabled={key === 'emailEnabled'}
+          <input type="checkbox" checked={key === 'emailEnabled' ? true : preferences[key]} disabled={key === 'emailEnabled'}
             onChange={e => setPreferences({ ...preferences, [key]: e.target.checked })} /> {label}
         </label>)}
+        <p style={{ fontSize: '12px', color: 'var(--muted-text)', margin: '8px 0 14px' }}>
+          Essential communications (reservation approval, Stripe payment receipts, handover check-in, and final VAT invoices) are delivered directly to your verified email.
+        </p>
         <button type="button" disabled={saving} onClick={() => void savePreferences()}>Save preferences</button>
       </> : <p>Loading preferences…</p>}
     </section>}

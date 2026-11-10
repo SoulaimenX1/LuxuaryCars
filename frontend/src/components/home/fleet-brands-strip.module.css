@@ -1,0 +1,206 @@
+/* ==================================================================
+   LUXURYCARS — FLEET BRANDS MARQUEE STRIP
+   ------------------------------------------------------------------
+   Bande rectangulaire animée haute joaillerie affichant les logos
+   officiels des marques de la flotte (Ferrari, Porsche, Rolls-Royce, etc.).
+   Affichage exclusif des logos / symboles, aucun texte visible,
+   défilement continu sans saccade, arrêt fluide au survol.
+   ================================================================== */
+
+.brandStrip {
+  position: relative;
+  width: 100%;
+  margin-top: 36px;
+  margin-bottom: 56px;
+  overflow: hidden;
+  background: var(--surface-glass, rgba(255, 255, 255, 0.7));
+  border: 1px solid var(--line);
+  /* Design rectangulaire pur */
+  border-radius: 0;
+  padding: 18px 0;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 10px 30px -15px rgba(15, 15, 17, 0.08);
+
+  /* Dégradé de fondu doux sur les bords gauche et droit */
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 60px,
+    black calc(100% - 60px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 60px,
+    black calc(100% - 60px),
+    transparent 100%
+  );
+
+  /* Aucun scrollbar visible */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.brandStrip::-webkit-scrollbar {
+  display: none;
+}
+
+:global(html[data-theme="dark"]) .brandStrip {
+  background: linear-gradient(180deg, rgba(22, 22, 26, 0.85) 0%, rgba(14, 14, 17, 0.94) 100%);
+  border-color: var(--line);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 18px 40px -20px rgba(0, 0, 0, 0.7);
+}
+
+.brandTrack {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  will-change: transform;
+  animation: marqueeInfinite 40s linear infinite;
+}
+
+/* Pause au survol pour permettre l'inspection détaillée et le clic */
+.brandStrip:hover .brandTrack,
+.brandStrip:focus-within .brandTrack {
+  animation-play-state: paused;
+}
+
+@keyframes marqueeInfinite {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.brandGroup {
+  display: flex;
+  align-items: center;
+  gap: 56px;
+  padding-right: 56px;
+}
+
+.brandItem {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-width: 52px;
+  opacity: 0.82;
+  transition: opacity 0.28s var(--ease-lux, cubic-bezier(0.16, 1, 0.3, 1)),
+              transform 0.28s var(--ease-lux, cubic-bezier(0.16, 1, 0.3, 1)),
+              filter 0.28s ease;
+  text-decoration: none;
+  cursor: pointer;
+  outline: none;
+}
+
+.brandItem:hover,
+.brandItem:focus-visible {
+  opacity: 1;
+  transform: scale(1.12);
+  filter: drop-shadow(0 0 10px rgba(223, 198, 153, 0.55));
+}
+
+/* Logo image styling : préserve rigoureusement les proportions et la transparence */
+.brandLogoImg {
+  height: 36px;
+  max-height: 36px;
+  width: auto;
+  max-width: 90px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  filter: brightness(0.95);
+  transition: filter 0.25s ease;
+}
+
+:global(html[data-theme="dark"]) .brandLogoImg {
+  filter: brightness(1) drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+}
+
+.brandItem:hover .brandLogoImg {
+  filter: brightness(1.15) drop-shadow(0 0 8px rgba(223, 198, 153, 0.6));
+}
+
+/* Accessibilité : désactivation de l'animation automatique si réduit */
+@media (prefers-reduced-motion: reduce) {
+  .brandTrack {
+    animation: none;
+    overflow-x: auto;
+    width: 100%;
+    scrollbar-width: none;
+  }
+
+  .brandTrack::-webkit-scrollbar {
+    display: none;
+  }
+
+  .brandGroup {
+    gap: 40px;
+    padding-right: 40px;
+  }
+}
+
+/* Responsive tablette et mobile */
+@media (max-width: 1024px) {
+  .brandStrip {
+    margin-top: 28px;
+    margin-bottom: 44px;
+    padding: 16px 0;
+  }
+
+  .brandGroup {
+    gap: 46px;
+    padding-right: 46px;
+  }
+
+  .brandTrack {
+    animation-duration: 36s;
+  }
+}
+
+@media (max-width: 768px) {
+  .brandStrip {
+    margin-top: 22px;
+    margin-bottom: 36px;
+    padding: 12px 0;
+    mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 32px,
+      black calc(100% - 32px),
+      transparent 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 32px,
+      black calc(100% - 32px),
+      transparent 100%
+    );
+  }
+
+  .brandTrack {
+    animation-duration: 30s;
+  }
+
+  .brandGroup {
+    gap: 36px;
+    padding-right: 36px;
+  }
+
+  .brandItem {
+    height: 32px;
+    min-width: 44px;
+  }
+
+  .brandLogoImg {
+    height: 28px;
+    max-height: 28px;
+    max-width: 70px;
+  }
+}

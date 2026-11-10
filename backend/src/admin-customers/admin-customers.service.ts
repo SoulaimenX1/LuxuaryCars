@@ -29,11 +29,25 @@ export class AdminCustomersService {
     const profiles = await this.profiles.find();
     const reservations = await this.reservations.find({ order: { createdAt: 'DESC' } });
     const byUser = new Map(profiles.map((profile) => [profile.userId, profile]));
-    return users.map(({ id, firstName, lastName, email, phone, status, createdAt }) => ({
-      id, firstName, lastName, email, phone, status, createdAt,
-      profile: byUser.get(id) ?? null,
-      reservations: reservations.filter((reservation) => reservation.customerId === id),
-    }));
+    return users
+      .filter((user) => {
+        const profile = byUser.get(user.id);
+        return Boolean(profile && profile.licenseNumber && profile.licenseNumber.trim());
+      })
+      .map(({ id, firstName, lastName, email, phone, status, createdAt }) => ({
+        id,
+        firstName,
+        lastName,
+        email,
+        phone,
+        status,
+        createdAt,
+        profile: byUser.get(id) ?? null,
+        reservations: reservations.filter(
+          (reservation) =>
+            reservation.customerId === id && String(reservation.status) !== 'no_show',
+        ),
+      }));
   }
 
   async findById(id: string) {

@@ -1,0 +1,207 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 10, 12, 0.85);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal {
+  width: min(100%, 460px);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-card);
+  box-shadow: 0 30px 90px -20px rgba(0, 0, 0, 0.8), 0 0 0 1px var(--champagne-line);
+  overflow: hidden;
+  animation: popIn 0.25s var(--ease-lux);
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.96) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--surface-glass);
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-cinzel), serif;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--champagne);
+  text-transform: uppercase;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+}
+
+.closeBtn:hover {
+  color: var(--champagne);
+}
+
+.body {
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: center;
+}
+
+.title {
+  font-family: var(--font-cinzel), serif;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+
+.lead {
+  font-size: 13px;
+  color: var(--muted-text);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.codeCard {
+  padding: 22px;
+  background: #090a0d;
+  border: 1px solid var(--champagne);
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: inset 0 0 30px rgba(179, 146, 90, 0.1);
+}
+
+.codeLabel {
+  font-family: var(--font-cinzel), serif;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--champagne);
+}
+
+.codeDigits {
+  display: flex;
+  gap: 8px;
+}
+
+.digitBox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--champagne-line);
+  border-radius: var(--radius-field);
+  font-family: monospace;
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 0 12px rgba(179, 146, 90, 0.5);
+}
+
+.codeRef {
+  font-size: 11px;
+  color: #8b867e;
+  letter-spacing: 0.06em;
+}
+
+.metaGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  text-align: left;
+}
+
+.metaItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field);
+}
+
+.metaIcon {
+  color: var(--champagne);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.metaLabel {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-text);
+  margin-bottom: 2px;
+}
+
+.metaValue {
+  display: block;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.footerNote {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted-text);
+  padding: 10px 12px;
+  background: var(--surface-glass);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-field);
+}
+
+.footer {
+  padding: 14px 24px;
+  background: var(--surface-glass);
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.doneBtn {
+  padding: 8px 24px;
+  background: var(--champagne);
+  color: #070709;
+  border: none;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--radius-button);
+  cursor: pointer;
+  transition: all var(--dur-1) var(--ease-lux);
+}
+
+.doneBtn:hover {
+  filter: brightness(1.1);
+}

@@ -29,7 +29,6 @@ export class AvailabilityController {
     @Param('vehicleId', new ParseUUIDPipe({ version: '4' })) vehicleId: string,
     @Query() query: CalendarQueryDto,
   ) {
-    await this.noShow?.scanExpiredReservations().catch(() => undefined);
     return this.availability.calendar(vehicleId, query.month);
   }
 }
@@ -44,7 +43,6 @@ export class AvailabilityCheckController {
 
   @Post('check')
   async check(@Body() body: CheckIntervalDto) {
-    await this.noShow?.scanExpiredReservations().catch(() => undefined);
     const { vehicleId, pickupAt, returnAt } = body;
     return this.availability.check({
       vehicleId,
@@ -57,7 +55,6 @@ export class AvailabilityCheckController {
   // véhicules alternatifs réellement disponibles.
   @Post('alternatives')
   async alternatives(@Body() body: AlternativesQueryDto) {
-    await this.noShow?.scanExpiredReservations().catch(() => undefined);
     return this.availability.getAlternatives(body);
   }
 }

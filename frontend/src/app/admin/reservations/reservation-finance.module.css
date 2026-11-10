@@ -28,9 +28,9 @@
 .header h3 {
   margin-top: 6px;
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 24px;
-  font-weight: 400;
+  font-family: var(--font-manrope, var(--sans));
+  font-size: 19px;
+  font-weight: 600;
 }
 
 .status {
@@ -90,9 +90,9 @@
 .history h4,
 .documents h4 {
   color: var(--ink);
-  font-family: var(--serif);
-  font-size: 18px;
-  font-weight: 400;
+  font-family: var(--font-manrope, var(--sans));
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .forms label {

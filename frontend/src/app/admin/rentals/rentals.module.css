@@ -36,9 +36,9 @@
 }
 
 .title {
-  font-family: var(--serif);
-  font-size: 32px;
-  font-weight: 400;
+  font-family: var(--font-newsreader, var(--serif));
+  font-size: 30px;
+  font-weight: 550;
   color: var(--ink);
   letter-spacing: -0.02em;
   margin: 0 0 8px 0;
@@ -68,7 +68,7 @@
 
 .refreshButton:hover {
   background: var(--champagne);
-  color: #000;
+  color: var(--on-accent, #070709);
   border-color: var(--champagne);
 }
 
@@ -99,9 +99,10 @@
 }
 
 .summaryValue {
-  font-family: var(--serif);
-  font-size: 28px;
-  font-weight: 500;
+  font-family: var(--font-manrope, var(--sans));
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -144,16 +145,23 @@
   width: 100%;
   height: 42px;
   padding: 0 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-button);
-  color: var(--ink);
-  font-size: 13px;
+  background: var(--admin-filter-bg);
+  border: 1px solid var(--admin-filter-border);
+  border-radius: var(--admin-filter-radius, 0px);
+  color: var(--admin-filter-text);
+  font-size: 13.5px;
+  font-weight: 500;
   outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--admin-filter-placeholder);
 }
 
 .searchInput:focus {
-  border-color: var(--champagne);
+  border-color: var(--admin-filter-border-focus);
+  box-shadow: 0 0 0 1px var(--admin-filter-border-focus);
 }
 
 .filterPills {
@@ -164,14 +172,19 @@
 .pill {
   height: 42px;
   padding: 0 18px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-button);
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
+  background: var(--admin-filter-bg);
+  border: 1px solid var(--admin-filter-border);
+  border-radius: var(--admin-filter-radius, 0px);
+  color: var(--admin-filter-placeholder);
+  font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--dur-1) var(--ease-lux);
+}
+
+.pill:hover {
+  color: var(--admin-filter-text);
+  border-color: var(--admin-filter-border-focus);
 }
 
 .pillActive {
@@ -181,10 +194,10 @@
 }
 
 :global(html[data-theme="dark"]) .pillActive {
-  background: linear-gradient(135deg, #dfc593 0%, #c4a46a 50%, #9e7f45 100%);
-  color: #08080a;
-  border-color: #dfc593;
-  box-shadow: 0 0 16px rgba(196, 164, 106, 0.35);
+  background: #2A2417;
+  color: #F5F2EB;
+  border-color: #544936;
+  box-shadow: none;
 }
 
 .rentalList {
@@ -226,8 +239,9 @@
 }
 
 .vehicleName {
-  font-family: var(--serif);
-  font-size: 20px;
+  font-family: var(--font-manrope, var(--sans));
+  font-size: 17px;
+  font-weight: 600;
   color: var(--ink);
   margin: 2px 0 0 0;
 }

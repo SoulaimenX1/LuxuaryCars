@@ -130,6 +130,33 @@ export interface AlternativesResponse {
 // DEVIS ET OPTIONS
 // ----------------------------------------------------------
 
+export interface DynamicPricingAdjustment {
+  code: string;
+  label: string;
+  type: 'seasonal' | 'weekend' | 'category' | 'demand';
+  percentage: number;
+  amount: string;
+}
+
+export interface DynamicPricingBreakdown {
+  enabled: boolean;
+  baseDailyRate: string;
+  effectiveDailyRate: string;
+  averageFactor: number;
+  adjustments: DynamicPricingAdjustment[];
+  durationDiscount: {
+    tier: string;
+    percentage: number;
+    amount: string;
+  } | null;
+  taxes: {
+    rate: number;
+    name: string;
+    includedInTotal: boolean;
+    amount: string;
+  };
+}
+
 export interface BookingQuote {
   currency: 'EUR';
   vehicleId: string;
@@ -151,6 +178,7 @@ export interface BookingQuote {
     unitPrice: string;
   }[];
   terms: string[];
+  dynamicPricing?: DynamicPricingBreakdown;
 }
 
 export interface PremiumOption {

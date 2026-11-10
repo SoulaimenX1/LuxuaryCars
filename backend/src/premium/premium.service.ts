@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 import type { QuoteDto } from './dto/quote.dto.js';
 import type { LocationDto } from './dto/location.dto.js';
@@ -6,6 +6,7 @@ import type { CreateReviewDto } from './dto/review.dto.js';
 import type { AdminExtraDto } from './dto/admin-extra.dto.js';
 import type { AdminPromotionDto } from './dto/admin-promotion.dto.js';
 import { LocationsService } from '../locations/locations.service.js';
+import { DynamicPricingService, type DynamicPricingBreakdown } from '../pricing/dynamic-pricing.service.js';
 
 type Db = Pick<DataSource, 'query'> | Pick<EntityManager, 'query'>;
 type ExtraRow = {id: string; name: string; amount: string; pricing: 'once' | 'daily'};
@@ -20,6 +21,7 @@ export interface BookingQuote {
   locationFees:{pickup:string;dropoff:string;oneWay:string};
   extras: {id:string;name:string;total:string;pricing:'once'|'daily';unitPrice:string}[];
   terms: string[];
+  dynamicPricing?: DynamicPricingBreakdown;
 }
 
 @Injectable()
@@ -27,6 +29,7 @@ export class PremiumService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly locations: LocationsService,
+    @Optional() private readonly dynamicPricing?: DynamicPricingService,
   ) {}
 
   // Les prix sont calculés exclusivement depuis PostgreSQL (en centimes EUR).
@@ -74,7 +77,8 @@ export class PremiumService {
     input.dropoffServiceMode = 'APPROVED_POINT';
     const cents = (v: string|number) => Math.round(Number(v)*100);
     const format = (v:number) => (v/100).toFixed(2);
-    const base = cents(vehicle.daily_price)*days;
+    let base = cents(vehicle.daily_price)*days;
+    let effectiveDailyPrice = format(cents(vehicle.daily_price));
     const ids = input.extraIds ?? [];
     const extras: ExtraRow[] = ids.length ? await executor.query(
       `SELECT id,name,amount,pricing FROM premium_extras WHERE enabled = TRUE AND id = ANY($1::uuid[])`, [ids]) : [];
@@ -98,7 +102,27 @@ export class PremiumService {
       if (!promotions[0]) throw new BadRequestException('Promotion unavailable or expired');
       percentage = Number(promotions[0].percentage);
     }
-    const discount = Math.round((base+extraTotal)*percentage/100);
+    let discount = Math.round((base+extraTotal)*percentage/100);
+    let dynamicPricingBreakdown: DynamicPricingBreakdown | undefined = undefined;
+
+    if (this.dynamicPricing?.isEnabled()) {
+      const dynamicResult = await this.dynamicPricing.calculate({
+        vehicleId: vehicle.id,
+        baseDailyPriceCents: cents(vehicle.daily_price),
+        pickupAt: start,
+        returnAt: end,
+        rentalDays: days,
+        extraTotalCents: extraTotal,
+        promotionPercentage: percentage,
+        executor,
+      });
+
+      base = dynamicResult.baseAmountCents;
+      effectiveDailyPrice = format(dynamicResult.effectiveDailyPriceCents);
+      discount = dynamicResult.discountAmountCents;
+      dynamicPricingBreakdown = dynamicResult.breakdown;
+    }
+
     const grandTotal = base+extraTotal+delivery-discount;
     if (!Number.isSafeInteger(grandTotal) || grandTotal < 0 || grandTotal > 9999999999) {
       throw new BadRequestException('Invalid quotation amount');
@@ -112,7 +136,7 @@ export class PremiumService {
     const rules = feeRules[0];
     if (!rules) throw new ConflictException('Rental fee policy not configured');
     return {
-      currency:'EUR',vehicleId:vehicle.id,rentalDays:days,dailyPrice:format(cents(vehicle.daily_price)),
+      currency:'EUR',vehicleId:vehicle.id,rentalDays:days,dailyPrice:effectiveDailyPrice,
       baseAmount:format(base),extrasAmount:format(extraTotal),deliveryAmount:format(delivery),
       discountAmount:format(discount),totalAmount:format(grandTotal),
       depositAmount:format(cents(vehicle.security_deposit)),
@@ -120,6 +144,7 @@ export class PremiumService {
       pickupMethod,extras:detailed,
       pickupLocationId:pickupPlaceId,dropoffLocationId:dropoffPlaceId,
       pickupLocationName,dropoffLocationName,locationFees,
+      dynamicPricing: dynamicPricingBreakdown,
       terms:[
         'A valid driving licence is required for the entire rental period.',
         'Security deposit is separate from the rental total.',
@@ -128,6 +153,7 @@ export class PremiumService {
         `Mileage allowance: ${Number(rules.mileageAllowancePerDay)} km per rental day. Excess: EUR ${rules.excessMileageFee} / km.`,
         `Fuel shortfall: EUR ${rules.fuelFeePerPercent} per percentage point.`,
         `Late return: EUR ${rules.lateFeePerDay} per late day. Damage costs require staff assessment.`,
+        ...(dynamicPricingBreakdown ? ['Dynamic seasonal rate and duration privilege pricing applied. All taxes included.'] : []),
       ],
     };
   }

@@ -1,359 +1,428 @@
 'use client';
 
-import {
-    Suspense,
-    useEffect,
-    useRef,
-    useState,
-    type FormEvent,
-} from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useToast } from '@/components/toast';
-import styles from '../auth.module.css';
+import styles from './verify-email.module.css';
 
-function extractErrorMessage(data: {
-    message?: string | string[];
-}): string {
-    if (Array.isArray(data.message)) {
-        return data.message.join(' ');
-    }
-    if (typeof data.message === 'string') {
-        return data.message;
-    }
-    return 'An unexpected error occurred. Please try again.';
-}
+type VerificationState =
+  | 'verifying'
+  | 'success'
+  | 'already_verified'
+  | 'expired'
+  | 'invalid'
+  | 'request';
 
 function VerifyEmailContent() {
-    const toast = useToast();
-    const searchParams = useSearchParams();
-    const tokenFromUrl = searchParams.get('token')?.trim() ?? '';
-    const emailFromUrl = searchParams.get('email')?.trim() ?? '';
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const toast = useToast();
 
-    const [token, setToken] = useState(tokenFromUrl);
-    const [email, setEmail] = useState(emailFromUrl);
-    const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-    const [confirming, setConfirming] = useState(false);
-    const [requesting, setRequesting] = useState(false);
-    const [isVerified, setIsVerified] = useState(false);
+  const tokenFromUrl = searchParams.get('token')?.trim() ?? '';
+  const emailFromUrl = searchParams.get('email')?.trim() ?? '';
 
-    const autoSubmittedRef = useRef(false);
-    const inFlightRef = useRef(false);
-    const lastConfirmedTokenRef = useRef<string | null>(null);
+  const [status, setStatus] = useState<VerificationState>(
+    tokenFromUrl ? 'verifying' : 'request',
+  );
+  const [emailInput, setEmailInput] = useState(emailFromUrl);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [countdown, setCountdown] = useState(4);
 
-    async function confirmTokenValue(tokenValue: string) {
-        const cleanToken = tokenValue.trim();
-        if (!cleanToken) {
-            return;
+  // Resend state
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [retryAfter, setRetryAfter] = useState<number | null>(null);
+
+  const verificationAttemptedRef = useRef(false);
+
+  // Perform secure POST verification confirmation
+  const confirmToken = useCallback(
+    async (tokenVal: string, emailVal: string) => {
+      try {
+        setErrorMessage('');
+        const res = await fetch('/api/auth/verify-email/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token: tokenVal,
+            ...(emailVal ? { email: emailVal } : {}),
+          }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          const rawMsg = typeof data.message === 'string'
+            ? data.message
+            : Array.isArray(data.message)
+            ? data.message.join(' ')
+            : 'Invalid or expired verification token';
+
+          setErrorMessage(rawMsg);
+          setStatus('expired');
+          return;
         }
 
-        // Prevent duplicate concurrent requests or redundant re-submissions
-        if (inFlightRef.current || (isVerified && lastConfirmedTokenRef.current === cleanToken)) {
-            return;
+        if (data.alreadyVerified) {
+          setStatus('already_verified');
+          toast.success('Your email address has already been verified.', 'Account Verified');
+        } else {
+          setStatus('success');
+          toast.success('Your email address has been verified successfully.', 'Email Verified');
         }
+      } catch {
+        setErrorMessage('Unable to connect to verification service. Please try again.');
+        setStatus('invalid');
+      }
+    },
+    [toast],
+  );
 
-        inFlightRef.current = true;
-        setError('');
-        setSuccess('');
-        setConfirming(true);
+  // Automatic one-click confirmation on load when token is present
+  useEffect(() => {
+    if (tokenFromUrl && !verificationAttemptedRef.current) {
+      verificationAttemptedRef.current = true;
+      void confirmToken(tokenFromUrl, emailFromUrl);
+    }
+  }, [tokenFromUrl, emailFromUrl, confirmToken]);
 
-        try {
-            const candidateEmail = (emailFromUrl || email).trim();
-            const response = await fetch(
-                '/api/auth/verify-email/confirm',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        token: cleanToken,
-                        ...(candidateEmail ? { email: candidateEmail } : {}),
-                    }),
-                },
-            );
+  // Success state auto-redirect countdown
+  useEffect(() => {
+    if (status !== 'success') return;
 
-            const data = (await response.json()) as {
-                message?: string | string[];
-                verified?: boolean;
-                alreadyVerified?: boolean;
-            };
-
-            if (!response.ok) {
-                const failure = extractErrorMessage(data);
-                setError(failure);
-                toast.error(failure, 'Email verification');
-                return;
-            }
-
-            const message =
-                typeof data.message === 'string'
-                    ? data.message
-                    : data.alreadyVerified
-                    ? 'Your email address is already verified. You can sign in directly.'
-                    : 'Your email address has been verified successfully.';
-
-            setSuccess(message);
-            setIsVerified(true);
-            lastConfirmedTokenRef.current = cleanToken;
-            toast.success(message, 'Email verification');
-        } catch {
-            const failure =
-                'Unable to reach the server. Please try again.';
-            setError(failure);
-            toast.error(failure, 'Email verification');
-        } finally {
-            inFlightRef.current = false;
-            setConfirming(false);
-        }
+    if (countdown <= 0) {
+      const loginUrl = emailInput
+        ? `/login?email=${encodeURIComponent(emailInput)}&verified=1`
+        : '/login?verified=1';
+      router.push(loginUrl);
+      return;
     }
 
-    useEffect(() => {
-        if (tokenFromUrl && !autoSubmittedRef.current && !isVerified) {
-            autoSubmittedRef.current = true;
-            void Promise.resolve().then(() =>
-                confirmTokenValue(tokenFromUrl),
-            );
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [tokenFromUrl]);
+    const timer = setTimeout(() => {
+      setCountdown((c) => c - 1);
+    }, 1000);
 
-    async function handleConfirmSubmit(
-        event: FormEvent<HTMLFormElement>,
-    ) {
-        event.preventDefault();
-        if (confirming || inFlightRef.current || isVerified) {
-            return;
-        }
-        await confirmTokenValue(token);
+    return () => clearTimeout(timer);
+  }, [status, countdown, router, emailInput]);
+
+  // Countdown timer for rate limiting
+  useEffect(() => {
+    if (retryAfter === null || retryAfter <= 0) return;
+    const interval = setInterval(() => {
+      setRetryAfter((prev) => {
+        if (prev === null || prev <= 1) return null;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [retryAfter]);
+
+  // Handle Resend Verification Email
+  async function handleResend(e?: FormEvent) {
+    if (e) e.preventDefault();
+    const cleanEmail = emailInput.trim();
+    if (!cleanEmail || resendLoading || (retryAfter !== null && retryAfter > 0)) {
+      return;
     }
 
-    async function handleRequestSubmit(
-        event: FormEvent<HTMLFormElement>,
-    ) {
-        event.preventDefault();
-        const cleanEmail = email.trim();
-        if (requesting || !cleanEmail) {
-            return;
-        }
+    setResendLoading(true);
+    setResendError(null);
+    setResendSuccess(null);
 
-        setError('');
-        setSuccess('');
-        setRequesting(true);
+    try {
+      const res = await fetch('/api/auth/verify-email/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail }),
+      });
 
-        try {
-            const response = await fetch(
-                '/api/auth/verify-email/request',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: cleanEmail,
-                    }),
-                },
-            );
+      const data = await res.json().catch(() => ({}));
 
-            const data = (await response.json()) as {
-                message?: string | string[];
-                alreadyVerified?: boolean;
-            };
+      if (res.status === 429) {
+        const retryHeader = res.headers.get('retry-after');
+        const seconds = retryHeader ? parseInt(retryHeader, 10) : 30;
+        setRetryAfter(isNaN(seconds) ? 30 : seconds);
+        setResendError(`Rate limit reached. Please wait ${isNaN(seconds) ? 30 : seconds}s before requesting another verification email.`);
+        return;
+      }
 
-            if (!response.ok) {
-                const failure = extractErrorMessage(data);
-                setError(failure);
-                toast.error(failure, 'Email verification');
-                return;
-            }
+      if (!res.ok) {
+        const msg = typeof data.message === 'string'
+          ? data.message
+          : Array.isArray(data.message)
+          ? data.message.join(' ')
+          : 'Failed to send verification email. Please try again.';
+        setResendError(msg);
+        return;
+      }
 
-            if (data.alreadyVerified) {
-                setIsVerified(true);
-            }
+      if (data.alreadyVerified) {
+        setStatus('already_verified');
+        return;
+      }
 
-            const message =
-                typeof data.message === 'string'
-                    ? data.message
-                    : 'If an unverified account matches this email, a verification link has been sent.';
-            setSuccess(message);
-            toast.success(message, 'Email verification');
-        } catch {
-            const failure =
-                'Unable to reach the server. Please try again.';
-            setError(failure);
-            toast.error(failure, 'Email verification');
-        } finally {
-            setRequesting(false);
-        }
+      setResendSuccess('A new verification email has been sent. Please check your inbox and click "VERIFY MY EMAIL".');
+      toast.success('Verification email sent.', 'Check Inbox');
+    } catch {
+      setResendError('Unable to connect to verification service. Please try again.');
+    } finally {
+      setResendLoading(false);
     }
+  }
 
-    return (
-        <main className={styles.page}>
-            <section className={styles.visualSection}>
-                <Link href="/" className={styles.logo}>
-                    <span className={styles.logoMark}>L</span>
-                    <span className={styles.logoText}>
-                        <strong>LUXURY</strong>
-                        <span>CAR RENTAL</span>
+  const navigateToLogin = () => {
+    const loginUrl = emailInput
+      ? `/login?email=${encodeURIComponent(emailInput)}&verified=1`
+      : '/login?verified=1';
+    router.push(loginUrl);
+  };
+
+  return (
+    <main className={styles.page}>
+      {/* Brand Visual Column */}
+      <section className={styles.visualSection}>
+        <Link href="/" className={styles.logo}>
+          <span className={styles.logoMark}>L</span>
+          <span className={styles.logoText}>
+            <strong>LUXUAR</strong>
+            <span>PREMIUM RENTAL</span>
+          </span>
+        </Link>
+
+        <div className={styles.visualContent}>
+          <span className={styles.visualLabel}>IDENTITY ASSURANCE</span>
+          <h1>
+            Seamless <span>Email Verification</span>
+          </h1>
+          <p>
+            Confirming your email address activates your bespoke privileges,
+            priority reservations, and direct access to our verified supercar fleet.
+          </p>
+        </div>
+
+        <span className={styles.visualFooter}>
+          INSTITUTIONAL LUXURY · VERIFIED ACCESS
+        </span>
+      </section>
+
+      {/* Interactive Verification Console */}
+      <section className={styles.formSection}>
+        <div className={styles.cardContainer}>
+          <Link href="/login" className={styles.backLink}>
+            ← Back to sign in
+          </Link>
+
+          {/* 1. VERIFYING STATE */}
+          {status === 'verifying' && (
+            <div>
+              <div className={`${styles.badgeIcon} ${styles.badgeLoading}`}>
+                <div className={styles.spinner} />
+              </div>
+              <span className={styles.kicker}>AUTHENTICATING LINK</span>
+              <h2 className={styles.title}>Verifying Your Email Address…</h2>
+              <p className={styles.subtitle}>
+                Validating your luxury credentials and securing your account access with our concierge service.
+              </p>
+            </div>
+          )}
+
+          {/* 2. SUCCESS STATE */}
+          {status === 'success' && (
+            <div>
+              <div className={`${styles.badgeIcon} ${styles.badgeSuccess}`}>
+                ✓
+              </div>
+              <span className={styles.kicker}>MEMBERSHIP CONFIRMED</span>
+              <h2 className={styles.title}>Email Verified Successfully</h2>
+              <p className={styles.subtitle}>
+                Welcome to LUXUAR. Your email address has been confirmed and your bespoke reservation privileges are now active.
+              </p>
+
+              <div className={styles.infoBox}>
+                <strong>Account Activated</strong>
+                {emailInput ? `Verified account: ${emailInput}` : 'You can now sign in with your credentials or biometric passkey.'}
+              </div>
+
+              <span className={styles.countdownText}>
+                Redirecting you to sign in in {countdown} second{countdown !== 1 ? 's' : ''}…
+              </span>
+
+              <button
+                type="button"
+                onClick={navigateToLogin}
+                className={styles.btnPrimary}
+              >
+                Continue to Sign In Now →
+              </button>
+
+              <Link href="/" className={styles.btnSecondary}>
+                Return to Vehicle Catalog
+              </Link>
+            </div>
+          )}
+
+          {/* 3. ALREADY VERIFIED STATE */}
+          {status === 'already_verified' && (
+            <div>
+              <div className={`${styles.badgeIcon} ${styles.badgeSuccess}`}>
+                ✓
+              </div>
+              <span className={styles.kicker}>MEMBERSHIP ACTIVE</span>
+              <h2 className={styles.title}>Account Already Verified</h2>
+              <p className={styles.subtitle}>
+                Your email address has already been verified. You have full access to our vehicle catalog and reservations.
+              </p>
+
+              <div className={styles.infoBox}>
+                <strong>Direct Access Ready</strong>
+                {emailInput ? `Verified account: ${emailInput}` : 'Your credentials are fully active.'}
+              </div>
+
+              <button
+                type="button"
+                onClick={navigateToLogin}
+                className={styles.btnPrimary}
+              >
+                Sign In to Your Account →
+              </button>
+
+              <Link href="/vehicles" className={styles.btnSecondary}>
+                Browse Fleet
+              </Link>
+            </div>
+          )}
+
+          {/* 4. EXPIRED OR INVALID STATE */}
+          {(status === 'expired' || status === 'invalid') && (
+            <div>
+              <div className={`${styles.badgeIcon} ${styles.badgeWarning}`}>
+                ⚠
+              </div>
+              <span className={styles.kicker}>VERIFICATION LINK NOTICE</span>
+              <h2 className={styles.title}>
+                {status === 'expired' ? 'Verification Link Expired' : 'Invalid Verification Link'}
+              </h2>
+              <p className={styles.subtitle}>
+                For institutional security, email verification links are single-use and expire 5 minutes after issuance.
+              </p>
+
+              {errorMessage && (
+                <div className={styles.errorBanner}>{errorMessage}</div>
+              )}
+
+              {resendSuccess && (
+                <div className={styles.successBanner}>{resendSuccess}</div>
+              )}
+
+              {resendError && (
+                <div className={styles.errorBanner}>{resendError}</div>
+              )}
+
+              <form onSubmit={handleResend} style={{ marginTop: '1.5rem' }}>
+                <div className={styles.fieldGroup}>
+                  <label htmlFor="resend-email" className={styles.fieldLabel}>
+                    Registered Email Address
+                  </label>
+                  <input
+                    id="resend-email"
+                    type="email"
+                    className={styles.textInput}
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="client@luxurycars.hu"
+                    required
+                    disabled={resendLoading}
+                  />
+                  {retryAfter !== null && retryAfter > 0 && (
+                    <span className={styles.rateLimitNotice}>
+                      Rate limit active. Please wait {retryAfter}s before requesting again.
                     </span>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className={styles.btnPrimary}
+                  disabled={resendLoading || (retryAfter !== null && retryAfter > 0)}
+                >
+                  {resendLoading ? 'Sending…' : 'Resend Verification Link'}
+                </button>
+              </form>
+
+              <Link href="/login" className={styles.btnSecondary} style={{ marginTop: '1rem' }}>
+                Return to Sign In
+              </Link>
+            </div>
+          )}
+
+          {/* 5. STANDALONE REQUEST STATE (No token in URL) */}
+          {status === 'request' && (
+            <div>
+              <span className={styles.kicker}>EMAIL VERIFICATION</span>
+              <h2 className={styles.title}>Verify Your Email</h2>
+              <p className={styles.subtitle}>
+                Enter your registered email address below to receive an instant, one-click verification link.
+              </p>
+
+              {resendSuccess && (
+                <div className={styles.successBanner}>{resendSuccess}</div>
+              )}
+
+              {resendError && (
+                <div className={styles.errorBanner}>{resendError}</div>
+              )}
+
+              <form onSubmit={handleResend} style={{ marginTop: '1.5rem' }}>
+                <div className={styles.fieldGroup}>
+                  <label htmlFor="request-email" className={styles.fieldLabel}>
+                    Registered Account Email
+                  </label>
+                  <input
+                    id="request-email"
+                    type="email"
+                    className={styles.textInput}
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    placeholder="client@luxurycars.hu"
+                    required
+                    disabled={resendLoading}
+                  />
+                  {retryAfter !== null && retryAfter > 0 && (
+                    <span className={styles.rateLimitNotice}>
+                      Rate limit active. Please wait {retryAfter}s before requesting again.
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className={styles.btnPrimary}
+                  disabled={resendLoading || (retryAfter !== null && retryAfter > 0)}
+                >
+                  {resendLoading ? 'Sending Link…' : 'Send Verification Email'}
+                </button>
+              </form>
+
+              <p style={{ marginTop: '1.75rem', fontSize: '0.82rem', color: 'var(--muted, #6e675f)', textAlign: 'center' }}>
+                Already verified?{' '}
+                <Link href="/login" style={{ color: 'var(--champagne-2, #c5a880)', textDecoration: 'none', fontWeight: 600 }}>
+                  Sign in directly
                 </Link>
-
-                <div className={styles.visualContent}>
-                    <span className={styles.visualLabel}>
-                        IDENTITY ASSURANCE
-                    </span>
-
-                    <h1>
-                        Verify
-                        <span>your email</span>
-                    </h1>
-
-                    <p>
-                        Confirming your email address ensures reliable
-                        delivery of booking confirmations, check-in codes
-                        and rental statements.
-                    </p>
-                </div>
-
-                <span className={styles.visualFooter}>
-                    VERIFIED MEMBER ACCESS · BESPOKE SERVICE
-                </span>
-            </section>
-
-            <section className={styles.formSection}>
-                <div className={styles.formContainer}>
-                    <Link href="/login" className={styles.backLink}>
-                        ← Back to sign in
-                    </Link>
-
-                    <span className={styles.formLabel}>
-                        EMAIL VERIFICATION
-                    </span>
-
-                    <h2>Confirm your email</h2>
-
-                    <p className={styles.formSubtitle}>
-                        Enter your verification token below or request a
-                        fresh verification email.
-                    </p>
-
-                    {isVerified ? (
-                        <div style={{ marginTop: '28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            <div className={styles.success}>
-                                {success || 'Your email address has been verified successfully.'}
-                            </div>
-                            <p className={styles.formSubtitle} style={{ marginTop: 0 }}>
-                                Your membership is confirmed. You now have full access to our concierge reservation services and vehicle catalog.
-                            </p>
-                            <Link
-                                href="/login"
-                                className={styles.submitButton}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    textDecoration: 'none',
-                                }}
-                            >
-                                Continue to sign in
-                            </Link>
-                        </div>
-                    ) : (
-                        <>
-                            <form
-                                className={styles.form}
-                                onSubmit={handleConfirmSubmit}
-                            >
-                                <div className={styles.field}>
-                                    <label htmlFor="verify-token">
-                                        Verification token
-                                    </label>
-                                    <input
-                                        id="verify-token"
-                                        type="text"
-                                        placeholder="Paste your email verification token"
-                                        required
-                                        value={token}
-                                        disabled={confirming}
-                                        onChange={(event) =>
-                                            setToken(event.target.value)
-                                        }
-                                    />
-                                </div>
-
-                                {error && (
-                                    <div className={styles.error}>
-                                        {error}
-                                    </div>
-                                )}
-
-                                {success && (
-                                    <div className={styles.success}>
-                                        {success}
-                                    </div>
-                                )}
-
-                                <button
-                                    className={styles.submitButton}
-                                    type="submit"
-                                    disabled={confirming}
-                                >
-                                    {confirming
-                                        ? 'Verifying email...'
-                                        : 'Verify email'}
-                                </button>
-                            </form>
-
-                            <form
-                                className={styles.form}
-                                onSubmit={handleRequestSubmit}
-                            >
-                                <div className={styles.field}>
-                                    <label htmlFor="resend-email">
-                                        Need a new verification link?
-                                    </label>
-                                    <input
-                                        id="resend-email"
-                                        type="email"
-                                        autoComplete="email"
-                                        placeholder="name@example.com"
-                                        required
-                                        value={email}
-                                        disabled={requesting}
-                                        onChange={(event) =>
-                                            setEmail(event.target.value)
-                                        }
-                                    />
-                                </div>
-
-                                <button
-                                    className={styles.submitButton}
-                                    type="submit"
-                                    disabled={requesting}
-                                >
-                                    {requesting
-                                        ? 'Sending verification email...'
-                                        : 'Resend verification email'}
-                                </button>
-                            </form>
-                        </>
-                    )}
-
-                    <p className={styles.switchText}>
-                        Ready to continue?{' '}
-                        <Link href="/login">Sign in</Link>
-                    </p>
-                </div>
-            </section>
-        </main>
-    );
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+    </main>
+  );
 }
 
 export default function VerifyEmailPage() {
-    return (
-        <Suspense fallback={null}>
-            <VerifyEmailContent />
-        </Suspense>
-    );
+  return (
+    <Suspense fallback={<div style={{ padding: '2rem', textAlign: 'center' }}>Loading verification portal…</div>}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
 }

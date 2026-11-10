@@ -1,5 +1,6 @@
 import { InboxService } from './inbox.service.js';
 import { InboxController } from './inbox.controller.js';
+import { AdminCommunicationsController } from './admin-communications.controller.js';
 import { EmailOutboxService } from './email-outbox.service.js';
 
 import { Module, forwardRef } from '@nestjs/common';
@@ -40,6 +41,7 @@ import {
   controllers: [
     NotificationsController,
     InboxController,
+    AdminCommunicationsController,
   ],
 
   providers: [

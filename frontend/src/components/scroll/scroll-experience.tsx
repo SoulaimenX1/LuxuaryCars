@@ -1,14 +1,22 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import styles from './scroll-experience.module.css';
 
 /**
  * Composant de défilement Haute Horlogerie :
  * 1. Jauge de progression chronographique supérieure avec tête de lecture bijou (diamant spéculaire).
  * 2. Orbe de retour au sommet (Ascend Orb) flottant avec verre miroir et micro-flèche biseautée.
+ * 
+ * Note d'architecture : Désactivé sur les routes administratives (/admin) pour garantir
+ * qu'aucun élément flottant ne vienne masquer ou chevaucher les actions de tableau, menus
+ * contextuels, tiroirs ou boutons de pagination.
  */
 export default function ScrollExperience() {
+  const pathname = usePathname();
+  const isAdmin = pathname?.startsWith('/admin');
+
   const [progress, setProgress] = useState(0);
   const [visible, setVisible] = useState(false);
   const rafId = useRef<number | null>(null);
@@ -42,6 +50,9 @@ export default function ScrollExperience() {
   }, [updateScroll]);
 
   useEffect(() => {
+    // Si nous sommes dans l'espace admin, nous ne nous abonnons à aucun écouteur
+    if (isAdmin) return;
+
     // Écoute universelle (capture pour intercepter le défilement du document et de la fenêtre)
     window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
     document.addEventListener('scroll', handleScroll, { passive: true });
@@ -59,7 +70,7 @@ export default function ScrollExperience() {
         window.cancelAnimationFrame(rafId.current);
       }
     };
-  }, [handleScroll, updateScroll]);
+  }, [handleScroll, updateScroll, isAdmin]);
 
   const scrollToTop = () => {
     window.scrollTo({
@@ -67,6 +78,10 @@ export default function ScrollExperience() {
       behavior: 'smooth',
     });
   };
+
+  if (isAdmin) {
+    return null;
+  }
 
   return (
     <>

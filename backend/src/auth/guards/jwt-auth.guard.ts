@@ -15,10 +15,23 @@ import {
     User,
 } from '../../users/entities/user.entity.js';
 
+export interface JwtPayload {
+    sub: string;
+    role?: string;
+    scope?: string;
+    pre_auth?: boolean;
+    amr?: string[];
+    mfa_verified?: boolean;
+}
+
 export type AuthenticatedUser = Pick<
     User,
     'id' | 'firstName' | 'lastName' | 'email' | 'role'
->;
+> & {
+    mfaVerified?: boolean;
+    amr?: string[];
+    scope?: string;
+};
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -53,13 +66,11 @@ export class JwtAuthGuard implements CanActivate {
             );
         }
 
-        let payload: { sub: string };
+        let payload: JwtPayload;
 
         try {
             payload =
-                await this.jwtService.verifyAsync<{
-                    sub: string;
-                }>(token);
+                await this.jwtService.verifyAsync<JwtPayload>(token);
         } catch {
             throw new UnauthorizedException(
                 'Invalid or expired token',
@@ -72,6 +83,14 @@ export class JwtAuthGuard implements CanActivate {
         ) {
             throw new UnauthorizedException(
                 'Invalid token payload',
+            );
+        }
+
+        // Strict MFA gate: Pre-auth tokens (scope: 'mfa_pending' or pre_auth=true)
+        // are strictly prohibited from accessing standard authenticated endpoints.
+        if (payload.scope === 'mfa_pending' || payload.pre_auth === true) {
+            throw new UnauthorizedException(
+                'MFA verification required: pre-auth tokens cannot access protected endpoints',
             );
         }
 
@@ -95,6 +114,9 @@ export class JwtAuthGuard implements CanActivate {
             lastName: user.lastName,
             email: user.email,
             role: user.role,
+            mfaVerified: payload.mfa_verified ?? false,
+            amr: payload.amr ?? [],
+            scope: payload.scope ?? 'authenticated',
         };
 
         return true;

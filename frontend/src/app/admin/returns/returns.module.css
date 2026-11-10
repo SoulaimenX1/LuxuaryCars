@@ -32,9 +32,9 @@
 }
 
 .title {
-  font-family: var(--serif);
-  font-size: 32px;
-  font-weight: 400;
+  font-family: var(--font-newsreader, var(--serif));
+  font-size: 30px;
+  font-weight: 550;
   color: var(--ink);
   letter-spacing: -0.02em;
   margin: 0 0 8px 0;
@@ -76,9 +76,10 @@
 }
 
 .statValue {
-  font-family: var(--serif);
-  font-size: 28px;
-  font-weight: 500;
+  font-family: var(--font-manrope, var(--sans));
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--ink);
 }
 
@@ -122,28 +123,34 @@
 
 .searchInput {
   width: 100%;
-  height: 44px;
+  height: 42px;
   padding: 0 16px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-button);
-  color: var(--ink);
-  font-size: 13px;
+  background: var(--admin-filter-bg);
+  border: 1px solid var(--admin-filter-border);
+  border-radius: var(--admin-filter-radius, 0px);
+  color: var(--admin-filter-text);
+  font-size: 13.5px;
+  font-weight: 500;
   outline: none;
-  transition: border-color var(--dur-1) var(--ease-lux);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--admin-filter-placeholder);
 }
 
 .searchInput:focus {
-  border-color: var(--champagne);
+  border-color: var(--admin-filter-border-focus);
+  box-shadow: 0 0 0 1px var(--admin-filter-border-focus);
 }
 
 .refreshButton {
-  height: 44px;
+  height: 42px;
   padding: 0 20px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-button);
-  color: var(--ink);
+  background: var(--admin-filter-bg);
+  border: 1px solid var(--admin-filter-border);
+  border-radius: var(--admin-filter-radius, 0px);
+  color: var(--admin-filter-text);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.1em;
@@ -153,8 +160,8 @@
 }
 
 .refreshButton:hover {
-  border-color: var(--champagne);
-  color: var(--champagne-2);
+  border-color: var(--admin-filter-border-focus);
+  color: var(--gold-text);
 }
 
 /* Rental Card List */
@@ -185,6 +192,10 @@
   .rentalCard {
     grid-template-columns: 1fr;
   }
+  .cardActions {
+    min-width: 0;
+    width: 100%;
+  }
 }
 
 .cardMain {
@@ -201,9 +212,9 @@
 }
 
 .vehicleTitle {
-  font-family: var(--serif);
-  font-size: 20px;
-  font-weight: 500;
+  font-family: var(--font-manrope, var(--sans));
+  font-size: 17px;
+  font-weight: 600;
   color: var(--ink);
   margin: 0;
 }
@@ -265,6 +276,7 @@
 .cardActions {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 10px;
   min-width: 220px;
 }
@@ -328,7 +340,7 @@
 }
 
 .emptyTitle {
-  font-family: var(--serif);
+  font-family: var(--font-manrope, var(--sans));
   font-size: 22px;
   color: var(--ink);
   margin-bottom: 8px;
@@ -526,7 +538,7 @@
   background: var(--champagne);
   border: 1px solid var(--champagne);
   border-radius: var(--radius-button);
-  color: #000;
+  color: var(--on-accent, #070709);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.1em;

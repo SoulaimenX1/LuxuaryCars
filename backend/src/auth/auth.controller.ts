@@ -4,6 +4,8 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Inject,
+    Optional,
     Post,
     Req,
     UseGuards,
@@ -58,25 +60,37 @@ import {
 
 import {
     AuthRateLimitGuard,
+    resolveSafeClientIp,
 } from './rate-limit/auth-rate-limit.guard.js';
 
 import {
+    AUTH_RATE_LIMIT_OPTIONS,
     AuthRateLimit,
+} from './rate-limit/auth-rate-limit.options.js';
+
+import type {
+    AuthRateLimitOptions,
 } from './rate-limit/auth-rate-limit.options.js';
 
 interface RequestWithClientMeta {
     ip?: string;
     socket?: { remoteAddress?: string };
     headers?: {
+        authorization?: string;
         'user-agent'?: string;
-        'x-forwarded-for'?: string;
+        'x-forwarded-for'?: string | string[];
+        'x-real-ip'?: string | string[];
     };
+    user?: AuthenticatedUser;
 }
 
 @Controller('auth')
 export class AuthController {
     constructor(
         private readonly authService: AuthService,
+        @Optional()
+        @Inject(AUTH_RATE_LIMIT_OPTIONS)
+        private readonly rateLimitOptions?: AuthRateLimitOptions,
     ) { }
 
     // ==========================================
@@ -141,21 +155,29 @@ export class AuthController {
     @Post('verify-email/request')
     @HttpCode(HttpStatus.OK)
     @UseGuards(AuthRateLimitGuard)
-    @AuthRateLimit('register')
+    @AuthRateLimit('verify-email-request')
     requestEmailVerification(
         @Body() dto: RequestEmailVerificationDto,
+        @Req() req?: RequestWithClientMeta,
     ) {
-        return this.authService.requestEmailVerification(dto);
+        return this.authService.requestEmailVerification(
+            dto,
+            this.extractOptionalAuthContext(req),
+        );
     }
 
     @Post('verify-email/confirm')
     @HttpCode(HttpStatus.OK)
     @UseGuards(AuthRateLimitGuard)
-    @AuthRateLimit('login')
+    @AuthRateLimit('verify-email-confirm')
     confirmEmailVerification(
         @Body() dto: ConfirmEmailVerificationDto,
+        @Req() req?: RequestWithClientMeta,
     ) {
-        return this.authService.confirmEmailVerification(dto);
+        return this.authService.confirmEmailVerification(
+            dto,
+            this.extractOptionalAuthContext(req),
+        );
     }
 
     // ==========================================
@@ -165,7 +187,7 @@ export class AuthController {
     @Post('password-reset/request')
     @HttpCode(HttpStatus.OK)
     @UseGuards(AuthRateLimitGuard)
-    @AuthRateLimit('login')
+    @AuthRateLimit('password-reset-request')
     requestPasswordReset(
         @Body() dto: RequestPasswordResetDto,
     ) {
@@ -175,7 +197,7 @@ export class AuthController {
     @Post('password-reset/confirm')
     @HttpCode(HttpStatus.OK)
     @UseGuards(AuthRateLimitGuard)
-    @AuthRateLimit('login')
+    @AuthRateLimit('password-reset-confirm')
     confirmPasswordReset(
         @Body() dto: ConfirmPasswordResetDto,
     ) {
@@ -210,12 +232,22 @@ export class AuthController {
 
     private extractClientMeta(req?: RequestWithClientMeta) {
         if (!req) return undefined;
+        const resolvedIp = resolveSafeClientIp(
+            req,
+            Boolean(this.rateLimitOptions?.trustProxy),
+        );
         const ipAddress =
-            req.ip ??
-            req.headers?.['x-forwarded-for'] ??
-            req.socket?.remoteAddress ??
-            null;
+            resolvedIp !== 'unknown' ? resolvedIp : null;
         const userAgent = req.headers?.['user-agent'] ?? null;
         return { ipAddress, userAgent };
+    }
+
+    private extractOptionalAuthContext(req?: RequestWithClientMeta) {
+        if (!req) return undefined;
+        return {
+            userId: req.user?.id,
+            email: req.user?.email,
+            authorizationHeader: req.headers?.authorization ?? null,
+        };
     }
 }

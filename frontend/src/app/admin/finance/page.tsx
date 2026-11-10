@@ -1,8 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import styles from './finance.module.css';
-import { useConfirm } from '@/components/confirm-dialog';
 import { useToast } from '@/components/toast';
 
 // ==============================================================
@@ -158,7 +157,6 @@ async function errorOf(res: Response): Promise<string> {
 // ==============================================================
 
 export default function AdminFinancePage() {
-  const confirm = useConfirm();
   const toast = useToast();
 
   const [overview, setOverview] = useState<FinanceOverviewData | null>(null);
@@ -176,7 +174,28 @@ export default function AdminFinancePage() {
   const [documentsFilter, setDocumentsFilter] = useState<'all' | 'receipt' | 'invoice'>('all');
   const [search, setSearch] = useState('');
 
+  // Synchronisation depuis l'URL (?tab=transactions, ?tab=requests, ?filter=pending, etc.)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const syncFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'requests' || tab === 'transactions' || tab === 'documents' || tab === 'history') {
+        setActiveTab(tab);
+      }
+      const filter = params.get('filter');
+      if (filter === 'all' || filter === 'pending' || filter === 'decided') {
+        setRequestsFilter(filter);
+      }
+    };
+
+    syncFromUrl();
+    window.addEventListener('popstate', syncFromUrl);
+    return () => window.removeEventListener('popstate', syncFromUrl);
+  }, []);
+
   // Modals state
+  const [expandedTxId, setExpandedTxId] = useState<string | null>(null);
   const [approvingReal, setApprovingReal] = useState<AgencyPaymentRequest | null>(null);
   const [realMethod, setRealMethod] = useState<'cash' | 'card' | 'bank_transfer'>('cash');
   const [realNotes, setRealNotes] = useState('');
@@ -408,16 +427,9 @@ export default function AdminFinancePage() {
           1. HEADER & INTRO
           ======================================================== */}
       <header className={styles.hero}>
-        <div className={styles.eyebrow}>
-          <span>Financial Operations & Ledger</span>
-        </div>
         <h1 className={styles.title}>
-          Payments & <span>Reconciliation</span>
+          Payments &amp; <span>Reconciliation</span>
         </h1>
-        <p className={styles.intro}>
-          Verified Stripe revenue, in-person manual counter approvals, development simulation records, official
-          fiscal documents and payment audit trail.
-        </p>
       </header>
 
       {/* ========================================================
@@ -601,19 +613,16 @@ export default function AdminFinancePage() {
             </div>
           </div>
 
-          <div className={styles.tableWrapper}>
+          {/* Desktop Table View — 5 Clean Consolidated Columns */}
+          <div className={`${styles.desktopTable} ${styles.tableWrapper}`}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Reservation</th>
-                  <th>Customer</th>
-                  <th>Vehicle</th>
-                  <th>Agency Counter</th>
-                  <th>Rental Amount</th>
-                  <th>Deposit Hold</th>
-                  <th>Total Due</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th className={styles.thAgencyRes}>Reservation &amp; Date</th>
+                  <th className={styles.thAgencyCust}>Customer &amp; Agency</th>
+                  <th className={styles.thAgencyVeh}>Vehicle &amp; Purpose</th>
+                  <th className={styles.thAgencyFin}>Amounts &amp; Status</th>
+                  <th className={styles.thAgencyAct}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -633,51 +642,50 @@ export default function AdminFinancePage() {
                       <td>
                         <div className={styles.primaryText}>{req.customerName}</div>
                         <div className={styles.secondaryText}>{req.customerEmail}</div>
+                        <div className={styles.secondaryText} style={{ marginTop: '2px', opacity: 0.85 }}>
+                          📍 {req.agencyPaymentAgencyName || 'Agency Counter'}
+                        </div>
                       </td>
                       <td>
                         <div className={styles.primaryText}>{req.vehicleName}</div>
                         <span className={styles.monoRef}>{req.licensePlate}</span>
+                        <div className={styles.secondaryText} style={{ marginTop: '2px' }}>
+                          Settlement Balance
+                        </div>
                       </td>
                       <td>
-                        <div className={styles.primaryText}>{req.agencyPaymentAgencyName || 'Agency Counter'}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className={`${styles.amountStrong} ${styles.kpiValueGold}`}>
+                            {euro(req.totalDue)}
+                          </span>
+                          {isPending && (
+                            <span className={`${styles.badge} ${styles.badgePendingState}`}>
+                              Pending
+                            </span>
+                          )}
+                          {isApproved && (
+                            <span className={`${styles.badge} ${styles.badgeManual}`}>
+                              Approved
+                            </span>
+                          )}
+                          {isRejected && (
+                            <span className={`${styles.badge} ${styles.badgeRejected}`}>
+                              Rejected
+                            </span>
+                          )}
+                        </div>
+                        <div className={styles.secondaryText} style={{ marginTop: '3px' }}>
+                          Rental: {euro(req.totalAmount)} · Dep: {euro(req.depositAmount)}
+                        </div>
                         {req.paymentDeadlineAt && (
-                          <div className={styles.secondaryText}>
+                          <div className={styles.secondaryText} style={{ fontSize: '10.5px', color: '#b45309', marginTop: '1px' }}>
                             Deadline: {formatDate(req.paymentDeadlineAt)}
                           </div>
                         )}
                       </td>
-                      <td>
-                        <span className={styles.amountStrong}>{euro(req.totalAmount)}</span>
-                      </td>
-                      <td>
-                        <span>{euro(req.depositAmount)}</span>
-                        <div className={styles.secondaryText}>read-only hold</div>
-                      </td>
-                      <td>
-                        <span className={`${styles.amountStrong} ${styles.kpiValueGold}`}>
-                          {euro(req.totalDue)}
-                        </span>
-                      </td>
-                      <td>
-                        {isPending && (
-                          <span className={`${styles.badge} ${styles.badgePendingState}`}>
-                            Pending Decision
-                          </span>
-                        )}
-                        {isApproved && (
-                          <span className={`${styles.badge} ${styles.badgeManual}`}>
-                            Payment Approved
-                          </span>
-                        )}
-                        {isRejected && (
-                          <span className={`${styles.badge} ${styles.badgeRejected}`}>
-                            Rejected
-                          </span>
-                        )}
-                      </td>
                       <td style={{ textAlign: 'right' }}>
                         {isPending ? (
-                          <div className={styles.actionGroup}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                             <button
                               type="button"
                               onClick={() => {
@@ -687,9 +695,10 @@ export default function AdminFinancePage() {
                               }}
                               disabled={busy}
                               className={styles.btnPrimary}
+                              style={{ width: '100%', maxWidth: '140px', padding: '6px 10px', fontSize: '11.5px', textAlign: 'center' }}
                               title="Officially approve with collected payment attestation"
                             >
-                              Approve Payment
+                              Review &amp; Settle →
                             </button>
                             <button
                               type="button"
@@ -698,16 +707,16 @@ export default function AdminFinancePage() {
                                 setRejectReason('');
                               }}
                               disabled={busy}
-                              className={styles.btnDanger}
+                              className={styles.btnLinkDanger}
                               title="Reject request with mandatory reason"
                             >
-                              Reject
+                              Reject Request
                             </button>
                           </div>
                         ) : (
-                          <div className={styles.secondaryText}>
-                            {req.agencyPaymentDecisionNotes || 'Decision recorded'}
-                            {req.decidedByName && ` by ${req.decidedByName}`}
+                          <div className={styles.secondaryText} style={{ textAlign: 'right' }}>
+                            ✓ {req.agencyPaymentDecisionNotes || 'Decision recorded'}
+                            {req.decidedByName && ` (${req.decidedByName})`}
                           </div>
                         )}
                       </td>
@@ -717,7 +726,7 @@ export default function AdminFinancePage() {
 
                 {filteredRequests.length === 0 && (
                   <tr>
-                    <td colSpan={9}>
+                    <td colSpan={5}>
                       <div className={styles.emptyState}>
                         <span className={styles.emptyTitle}>No agency payment requests found</span>
                         <span>There are no requests matching the selected filter criteria.</span>
@@ -727,6 +736,95 @@ export default function AdminFinancePage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile & Tablet Responsive Cards */}
+          <div className={styles.mobileCardView}>
+            {filteredRequests.map((req) => {
+              const isPending = req.agencyPaymentStatus === 'agency_payment_requested';
+              const isApproved = req.agencyPaymentStatus === 'approved';
+              const isRejected = req.agencyPaymentStatus === 'rejected';
+
+              return (
+                <div key={req.id} className={styles.recordCard}>
+                  <div className={styles.recordCardHeader}>
+                    <div className={styles.recordCardHeaderLeft}>
+                      <span className={styles.monoRef}>{req.reservationNumber}</span>
+                      <span className={styles.secondaryText}>
+                        {formatDate(req.agencyPaymentRequestedAt || req.createdAt)}
+                      </span>
+                    </div>
+                    <div>
+                      {isPending && <span className={`${styles.badge} ${styles.badgePendingState}`}>Pending</span>}
+                      {isApproved && <span className={`${styles.badge} ${styles.badgeManual}`}>Approved</span>}
+                      {isRejected && <span className={`${styles.badge} ${styles.badgeRejected}`}>Rejected</span>}
+                    </div>
+                  </div>
+
+                  <div className={styles.recordCardGrid}>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Customer</span>
+                      <span className={styles.primaryText}>{req.customerName}</span>
+                      <span className={styles.secondaryText}>{req.customerEmail}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Vehicle</span>
+                      <span className={styles.primaryText}>{req.vehicleName}</span>
+                      <span className={styles.monoRef}>{req.licensePlate}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Agency</span>
+                      <span>{req.agencyPaymentAgencyName || 'Agency Counter'}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Total Due</span>
+                      <span className={`${styles.amountStrong} ${styles.kpiValueGold}`}>{euro(req.totalDue)}</span>
+                      <span className={styles.secondaryText}>Rental: {euro(req.totalAmount)} · Dep: {euro(req.depositAmount)}</span>
+                    </div>
+                  </div>
+
+                  {isPending && (
+                    <div className={styles.recordCardActions}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setApprovingReal(req);
+                          setRealMethod('cash');
+                          setRealNotes('');
+                        }}
+                        disabled={busy}
+                        className={styles.btnPrimary}
+                      >
+                        Approve Payment
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejectingRequest(req);
+                          setRejectReason('');
+                        }}
+                        disabled={busy}
+                        className={styles.btnDanger}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  )}
+                  {!isPending && (
+                    <div className={styles.secondaryText}>
+                      {req.agencyPaymentDecisionNotes || 'Decision recorded'}
+                      {req.decidedByName && ` by ${req.decidedByName}`}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {filteredRequests.length === 0 && (
+              <div className={styles.emptyState}>
+                <span className={styles.emptyTitle}>No agency payment requests found</span>
+                <span>There are no requests matching the selected filter criteria.</span>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -781,103 +879,147 @@ export default function AdminFinancePage() {
             </div>
           </div>
 
-          <div className={styles.tableWrapper}>
+          {/* Desktop Table View — Recommended 5-Group Consolidated Architecture */}
+          <div className={`${styles.desktopTable} ${styles.tableWrapper}`}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Date & Time</th>
-                  <th>Transaction Reference</th>
-                  <th>Reservation</th>
-                  <th>Customer</th>
-                  <th>Type</th>
-                  <th>Method</th>
-                  <th>Integrity Classification</th>
-                  <th>Amount</th>
-                  <th style={{ textAlign: 'right' }}>Receipt</th>
+                  <th className={styles.thTxRef}>Transaction</th>
+                  <th className={styles.thTxResCust}>Customer / Booking</th>
+                  <th className={styles.thTxType}>Financial Details</th>
+                  <th className={styles.thTxInteg}>Verification</th>
+                  <th className={styles.thTxAct}>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredTransactions.map((tx) => {
+                  const isExpanded = expandedTxId === tx.id;
+                  const typeLabel = tx.type === 'rental_payment'
+                    ? 'Rental Fee'
+                    : tx.type === 'deposit_payment'
+                    ? 'Security Deposit Hold'
+                    : tx.type === 'charge_payment'
+                    ? 'Additional Charge'
+                    : 'Refund';
+
                   return (
-                    <tr key={tx.id}>
-                      <td>
-                        <div>{formatDate(tx.paidAt)}</div>
-                      </td>
-                      <td>
-                        <span className={styles.monoRef}>{tx.reference || '—'}</span>
-                        {tx.notes && <div className={styles.secondaryText}>{tx.notes}</div>}
-                      </td>
-                      <td>
-                        <span className={styles.monoRef}>{tx.reservationNumber}</span>
-                        <div className={styles.secondaryText}>
-                          Rental: {euro(tx.rentalAmount)} · Dep: {euro(tx.depositAmount)}
-                        </div>
-                      </td>
-                      <td>
-                        <div className={styles.primaryText}>{tx.customerName}</div>
-                        <div className={styles.secondaryText}>{tx.customerEmail}</div>
-                      </td>
-                      <td>
-                        <span className={styles.primaryText}>
-                          {tx.type === 'rental_payment'
-                            ? 'Rental Fee'
-                            : tx.type === 'deposit_payment'
-                            ? 'Security Deposit Hold'
-                            : tx.type === 'charge_payment'
-                            ? 'Additional Charge'
-                            : 'Refund'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={styles.monoRef}>{tx.method.toUpperCase()}</span>
-                      </td>
-                      <td>
-                        {tx.integrityStatus === 'STRIPE_VERIFIED' && (
-                          <span className={`${styles.badge} ${styles.badgeStripe}`}>
-                            Stripe Verified
+                    <Fragment key={tx.id}>
+                      <tr
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setExpandedTxId(isExpanded ? null : tx.id)}
+                      >
+                        {/* 1. Transaction */}
+                        <td>
+                          <span className={styles.monoRef} title={tx.reference || tx.id}>
+                            {tx.reference || '—'}
                           </span>
-                        )}
-                        {tx.integrityStatus === 'MANUAL_VERIFIED' && (
-                          <span className={`${styles.badge} ${styles.badgeManual}`}>
-                            Manual Verified
-                          </span>
-                        )}
-                        {tx.integrityStatus === 'FAILED_REJECTED' && (
-                          <span className={`${styles.badge} ${styles.badgeRejected}`}>
-                            Rejected / Excluded
-                          </span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`${styles.amountStrong} ${tx.integrityStatus !== 'FAILED_REJECTED' ? styles.kpiValueGold : ''}`}>
-                          {euro(tx.amount)}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {tx.integrityStatus !== 'FAILED_REJECTED' ? (
+                          <div className={styles.secondaryText}>{formatDate(tx.paidAt)}</div>
+                        </td>
+
+                        {/* 2. Customer / Booking */}
+                        <td>
+                          <div className={styles.primaryText}>{tx.customerName}</div>
+                          <span className={styles.monoRef}>#{tx.reservationNumber}</span>
+                          <div className={styles.secondaryText}>{tx.customerEmail}</div>
+                        </td>
+
+                        {/* 3. Financial Details */}
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                            <span className={styles.primaryText}>{typeLabel}</span>
+                            <span className={`${styles.amountStrong} ${tx.integrityStatus !== 'FAILED_REJECTED' ? styles.kpiValueGold : ''}`}>
+                              {euro(tx.amount)}
+                            </span>
+                          </div>
+                          <div className={styles.secondaryText}>
+                            Rental: {euro(tx.rentalAmount)} · Dep: {euro(tx.depositAmount)}
+                          </div>
+                        </td>
+
+                        {/* 4. Verification */}
+                        <td>
+                          {tx.integrityStatus === 'STRIPE_VERIFIED' && (
+                            <span className={`${styles.badge} ${styles.badgeStripe}`}>
+                              Stripe Verified
+                            </span>
+                          )}
+                          {tx.integrityStatus === 'MANUAL_VERIFIED' && (
+                            <span className={`${styles.badge} ${styles.badgeManual}`}>
+                              Manual Verified
+                            </span>
+                          )}
+                          {tx.integrityStatus === 'FAILED_REJECTED' && (
+                            <span className={`${styles.badge} ${styles.badgeRejected}`}>
+                              Rejected / Excluded
+                            </span>
+                          )}
+                          <div className={styles.secondaryText} style={{ marginTop: '2px' }}>
+                            Channel: {tx.method.toUpperCase()}
+                          </div>
+                        </td>
+
+                        {/* 5. Action */}
+                        <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                           <button
                             type="button"
-                            onClick={() =>
-                              handleDownloadDocument(
-                                `/api/admin/operations/finance/payments/${tx.id}/receipt`,
-                                `receipt-${tx.reference || tx.id.slice(0, 8)}.pdf`,
-                              )
-                            }
-                            className={styles.btnLink}
+                            onClick={() => setExpandedTxId(isExpanded ? null : tx.id)}
+                            className={styles.inspectBtn}
+                            style={{ minWidth: '110px', padding: '7px 12px', fontSize: '11.5px', textAlign: 'center' }}
+                            title="Toggle transaction dossier"
                           >
-                            Receipt PDF ↗
+                            View Details {isExpanded ? '▲' : '▾'}
                           </button>
-                        ) : (
-                          <span className={styles.secondaryText}>Excluded</span>
-                        )}
-                      </td>
-                    </tr>
+                        </td>
+                      </tr>
+
+                      {/* Expandable Transaction Details Panel */}
+                      {isExpanded && (
+                        <tr className={styles.expandedRow}>
+                          <td colSpan={5} className={styles.expandedCell}>
+                            <div className={styles.expandedGrid}>
+                              <div className={styles.expandedItem}>
+                                <span className={styles.expandedLabel}>Full Transaction Reference</span>
+                                <span className={styles.monoRefFull}>{tx.reference || tx.id}</span>
+                              </div>
+                              <div className={styles.expandedItem}>
+                                <span className={styles.expandedLabel}>Customer &amp; Booking</span>
+                                <span>{tx.customerName} ({tx.customerEmail})</span>
+                                <span className={styles.monoRef}>Reservation #{tx.reservationNumber}</span>
+                              </div>
+                              <div className={styles.expandedItem}>
+                                <span className={styles.expandedLabel}>Audit Notes</span>
+                                <span>{tx.notes || 'Automated payment processing · Verified'}</span>
+                              </div>
+                              <div className={styles.expandedItem}>
+                                <span className={styles.expandedLabel}>Classification &amp; Receipt</span>
+                                <span>{tx.integrityStatus} · {tx.method.toUpperCase()}</span>
+                                {tx.integrityStatus !== 'FAILED_REJECTED' && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDownloadDocument(
+                                        `/api/admin/operations/finance/payments/${tx.id}/receipt`,
+                                        `receipt-${tx.reference || tx.id.slice(0, 8)}.pdf`,
+                                      )
+                                    }
+                                    className={styles.btnSecondary}
+                                    style={{ alignSelf: 'flex-start', marginTop: '6px' }}
+                                  >
+                                    Download PDF Receipt ↓
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
 
                 {filteredTransactions.length === 0 && (
                   <tr>
-                    <td colSpan={9}>
+                    <td colSpan={5}>
                       <div className={styles.emptyState}>
                         <span className={styles.emptyTitle}>No transactions found</span>
                         <span>There are no ledger entries matching your query.</span>
@@ -887,6 +1029,85 @@ export default function AdminFinancePage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile & Tablet Responsive Cards */}
+          <div className={styles.mobileCardView}>
+            {filteredTransactions.map((tx) => {
+              const typeLabel = tx.type === 'rental_payment'
+                ? 'Rental Fee'
+                : tx.type === 'deposit_payment'
+                ? 'Security Deposit Hold'
+                : tx.type === 'charge_payment'
+                ? 'Additional Charge'
+                : 'Refund';
+
+              return (
+                <div key={tx.id} className={styles.recordCard}>
+                  <div className={styles.recordCardHeader}>
+                    <div className={styles.recordCardHeaderLeft}>
+                      <span className={styles.primaryText}>{typeLabel}</span>
+                      <span className={styles.secondaryText}>{formatDate(tx.paidAt)}</span>
+                    </div>
+                    <div>
+                      {tx.integrityStatus === 'STRIPE_VERIFIED' && (
+                        <span className={`${styles.badge} ${styles.badgeStripe}`}>Stripe</span>
+                      )}
+                      {tx.integrityStatus === 'MANUAL_VERIFIED' && (
+                        <span className={`${styles.badge} ${styles.badgeManual}`}>Manual</span>
+                      )}
+                      {tx.integrityStatus === 'FAILED_REJECTED' && (
+                        <span className={`${styles.badge} ${styles.badgeRejected}`}>Rejected</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={styles.recordCardGrid}>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Reference</span>
+                      <span className={styles.monoRefFull}>{tx.reference || tx.id}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Reservation &amp; Customer</span>
+                      <span className={styles.monoRef}>{tx.reservationNumber}</span>
+                      <span>{tx.customerName}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Method</span>
+                      <span>{tx.method.toUpperCase()}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Amount</span>
+                      <span className={`${styles.amountStrong} ${styles.kpiValueGold}`}>{euro(tx.amount)}</span>
+                      <span className={styles.secondaryText}>Rental: {euro(tx.rentalAmount)} · Dep: {euro(tx.depositAmount)}</span>
+                    </div>
+                  </div>
+
+                  {tx.integrityStatus !== 'FAILED_REJECTED' && (
+                    <div className={styles.recordCardActions}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleDownloadDocument(
+                            `/api/admin/operations/finance/payments/${tx.id}/receipt`,
+                            `receipt-${tx.reference || tx.id.slice(0, 8)}.pdf`,
+                          )
+                        }
+                        className={styles.btnSecondary}
+                      >
+                        Download PDF Receipt ↓
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {filteredTransactions.length === 0 && (
+              <div className={styles.emptyState}>
+                <span className={styles.emptyTitle}>No transactions found</span>
+                <span>There are no ledger entries matching your query.</span>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -941,18 +1162,16 @@ export default function AdminFinancePage() {
             </div>
           </div>
 
-          <div className={styles.tableWrapper}>
+          {/* Desktop Table View */}
+          <div className={`${styles.desktopTable} ${styles.tableWrapper}`}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Document Type</th>
-                  <th>Document Number / Ref</th>
-                  <th>Reservation</th>
-                  <th>Customer</th>
-                  <th>Issue Date</th>
-                  <th>Amount</th>
-                  <th>Document Status</th>
-                  <th style={{ textAlign: 'right' }}>Download</th>
+                  <th className={styles.thDocNum}>Document &amp; Type</th>
+                  <th className={styles.thDocResCust}>Reservation &amp; Customer</th>
+                  <th className={styles.thDocDate}>Issue Date</th>
+                  <th className={styles.thDocAmt}>Amount &amp; Status</th>
+                  <th className={styles.thDocAct}>Download</th>
                 </tr>
               </thead>
               <tbody>
@@ -960,29 +1179,25 @@ export default function AdminFinancePage() {
                   return (
                     <tr key={`${doc.documentType}-${doc.id}`}>
                       <td>
-                        <span className={styles.primaryText}>
-                          {doc.documentType === 'receipt' ? 'Payment Receipt' : 'Fiscal Invoice'}
-                        </span>
-                      </td>
-                      <td>
                         <span className={styles.monoRef}>{doc.documentNumber}</span>
+                        <div className={styles.primaryText}>
+                          {doc.documentType === 'receipt' ? 'Payment Receipt' : 'Fiscal Invoice'}
+                        </div>
                       </td>
                       <td>
                         <span className={styles.monoRef}>{doc.reservationNumber}</span>
-                      </td>
-                      <td>
-                        <span>{doc.customerName}</span>
+                        <div className={styles.secondaryText}>{doc.customerName}</div>
                       </td>
                       <td>
                         <span>{formatDate(doc.issuedAt)}</span>
                       </td>
                       <td>
                         <span className={styles.amountStrong}>{euro(doc.amount)}</span>
-                      </td>
-                      <td>
-                        <span className={`${styles.badge} ${styles.badgeStripe}`}>
-                          Verified Fiscal
-                        </span>
+                        <div>
+                          <span className={`${styles.badge} ${styles.badgeStripe}`}>
+                            Verified Fiscal
+                          </span>
+                        </div>
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <button
@@ -1004,7 +1219,7 @@ export default function AdminFinancePage() {
 
                 {filteredDocuments.length === 0 && (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={5}>
                       <div className={styles.emptyState}>
                         <span className={styles.emptyTitle}>No documents found</span>
                         <span>There are no documents matching your query.</span>
@@ -1014,6 +1229,67 @@ export default function AdminFinancePage() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile & Tablet Responsive Cards */}
+          <div className={styles.mobileCardView}>
+            {filteredDocuments.map((doc) => {
+              return (
+                <div key={`${doc.documentType}-${doc.id}`} className={styles.recordCard}>
+                  <div className={styles.recordCardHeader}>
+                    <div className={styles.recordCardHeaderLeft}>
+                      <span className={styles.primaryText}>
+                        {doc.documentType === 'receipt' ? 'Payment Receipt' : 'Fiscal Invoice'}
+                      </span>
+                      <span className={styles.monoRef}>{doc.documentNumber}</span>
+                    </div>
+                    <div>
+                      <span className={`${styles.amountStrong} ${styles.kpiValueGold}`}>{euro(doc.amount)}</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.recordCardGrid}>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Reservation</span>
+                      <span className={styles.monoRef}>{doc.reservationNumber}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Customer</span>
+                      <span>{doc.customerName}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Issue Date</span>
+                      <span>{formatDate(doc.issuedAt)}</span>
+                    </div>
+                    <div className={styles.recordCardItem}>
+                      <span className={styles.recordCardItemLabel}>Status</span>
+                      <span className={`${styles.badge} ${styles.badgeStripe}`}>Verified Fiscal</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.recordCardActions}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleDownloadDocument(
+                          doc.downloadUrl,
+                          `${doc.documentType}-${doc.documentNumber}.pdf`,
+                        )
+                      }
+                      className={styles.btnSecondary}
+                    >
+                      Download PDF ↓
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+            {filteredDocuments.length === 0 && (
+              <div className={styles.emptyState}>
+                <span className={styles.emptyTitle}>No documents found</span>
+                <span>There are no documents matching your query.</span>
+              </div>
+            )}
           </div>
         </section>
       )}

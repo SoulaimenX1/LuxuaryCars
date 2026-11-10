@@ -1,0 +1,1204 @@
+/* ==============================================================
+   PRICING & INTELLIGENCE — UNIFIED LUXURY ADMIN STYLES
+   Executive-grade console styling for Luxury Cars administration
+   ============================================================== */
+
+.container {
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 1.25rem 4rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* ==============================================================
+   A. COMPACT HEADER
+   ============================================================== */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem 0 1.25rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.eyebrowRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.eyebrow {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold-text);
+}
+
+.eyebrowPill {
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  background: var(--champagne-soft);
+  color: var(--gold-text);
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+
+.title {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 1.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.subtitle {
+  font-size: 0.88rem;
+  color: var(--muted-text);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btnRefresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.95rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnRefresh:hover {
+  border-color: var(--gold-text);
+  color: var(--gold-text);
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ==============================================================
+   B. MASTER PRICING SWITCH BANNER
+   ============================================================== */
+
+.masterCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.35rem 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+.masterCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--gold-text);
+}
+
+.masterLeft {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.masterIconRing {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.masterIconRingActive {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.masterIconRingInactive {
+  background: rgba(150, 150, 150, 0.1);
+  color: var(--muted-text);
+  border: 1px solid var(--line);
+}
+
+.masterInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.masterTopRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.masterLabel {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold-text);
+}
+
+.statusPillActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.statusPillInactive {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-text);
+  background: rgba(150, 150, 150, 0.08);
+  padding: 0.2rem 0.6rem;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+}
+
+.pulseDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+  animation: pulseAnim 2s infinite ease-in-out;
+}
+
+@keyframes pulseAnim {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+.neutralDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-text);
+}
+
+.masterExplanation {
+  font-size: 0.86rem;
+  color: var(--ink);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.masterMeta {
+  font-size: 0.74rem;
+  color: var(--muted-text);
+}
+
+.masterRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.toggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.toggleBtnOff {
+  background: transparent;
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+.toggleBtnOff:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+.toggleBtnOn {
+  background: var(--gold-text);
+  color: #111111;
+  border: 1px solid var(--gold-text);
+  box-shadow: 0 2px 8px rgba(176, 138, 62, 0.3);
+}
+
+.toggleBtnOn:hover:not(:disabled) {
+  background: #c79e49;
+  border-color: #c79e49;
+}
+
+.toggleBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==============================================================
+   C. THREE KPI CARDS + COMPACT DEMAND CHART
+   ============================================================== */
+
+.section {
+  margin-bottom: 2.25rem;
+}
+
+.sectionHeadingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.15rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sectionTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.countPill {
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  background: var(--champagne-soft);
+  color: var(--gold-text);
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.sectionSubtitle {
+  font-size: 0.82rem;
+  color: var(--muted-text);
+  margin: 0.25rem 0 0 0;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.kpiCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.15rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.2s ease;
+}
+
+.kpiCard:hover {
+  border-color: var(--gold-text);
+}
+
+.kpiTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.kpiLabel {
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-text);
+}
+
+.kpiIcon {
+  color: var(--gold-text);
+}
+
+.kpiValueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.65rem;
+}
+
+.kpiValue {
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.kpiTrendBadge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.kpiSubtext {
+  font-size: 0.78rem;
+  color: var(--muted-text);
+  margin: 0;
+  line-height: 1.35;
+}
+
+/* Compact Demand Forecast Chart */
+.chartPanel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.25rem 1.4rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.chartTopBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.chartTitleCol {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.chartTitle {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.chartDescription {
+  font-size: 0.8rem;
+  color: var(--muted-text);
+  margin: 0;
+}
+
+.horizonPillGroup {
+  display: inline-flex;
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 2px;
+}
+
+.horizonBtn {
+  background: transparent;
+  border: none;
+  color: var(--muted-text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 0.35rem 0.8rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.horizonBtnActive {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rangeTrackContainer {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background: var(--background);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+
+.rangeFill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, rgba(176, 138, 62, 0.25), rgba(176, 138, 62, 0.65));
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.rangeTargetLine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--gold-text);
+  box-shadow: 0 0 6px rgba(176, 138, 62, 0.8);
+}
+
+.chartLegend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted-text);
+}
+
+.chartAdviceRow {
+  background: var(--champagne-soft);
+  border-left: 3px solid var(--gold-text);
+  padding: 0.65rem 0.95rem;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.84rem;
+  color: var(--ink);
+  line-height: 1.45;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chartReadinessPill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gold-text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0.2rem 0.55rem;
+  border-radius: 3px;
+}
+
+/* ==============================================================
+   D. VEHICLE PRICING RECOMMENDATIONS (3 cols / 2 cols / 1 col)
+   ============================================================== */
+
+.recGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.recCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recCard:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.cardImageWrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0f0e0d;
+  overflow: hidden;
+}
+
+.vehicleImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+
+.recCard:hover .vehicleImg {
+  transform: scale(1.03);
+}
+
+.cardBadgeTop {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--gold-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.55rem;
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+}
+
+.cardPlateBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #f8f6f2;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  backdrop-filter: blur(4px);
+}
+
+.cardBody {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.9rem;
+  flex: 1;
+}
+
+.cardVehicleTitle {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 0.45rem 0;
+  line-height: 1.3;
+}
+
+.priceComparisonRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--background);
+  border-radius: 4px;
+}
+
+.priceCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.priceLabelSmall {
+  font-size: 0.68rem;
+  color: var(--muted-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.currentPriceNum {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-decoration: line-through;
+}
+
+.recommendedPriceNum {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.shiftPill {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  border-radius: 4px;
+}
+
+.shiftPositive {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.shiftNegative {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.cardRationale {
+  font-size: 0.82rem;
+  color: var(--muted-text);
+  line-height: 1.4;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.confidenceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--muted-text);
+}
+
+.appliedStatusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  padding: 0.2rem 0.55rem;
+  border-radius: 3px;
+}
+
+.btnReviewCard {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--gold-text);
+  color: var(--gold-text);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.btnReviewCard:hover {
+  background: var(--gold-text);
+  color: #111111;
+}
+
+/* ==============================================================
+   E. ACTIVE PRICE ADJUSTMENTS
+   ============================================================== */
+
+.activeEmptyCard {
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  color: var(--muted-text);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.adjustmentsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.adjustmentCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
+.adjustmentLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.adjustmentThumb {
+  width: 80px;
+  height: 52px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #0f0e0d;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+}
+
+.adjustmentInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.adjustmentTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.adjustmentVehicleName {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.adjustmentPlate {
+  font-family: monospace;
+  font-size: 0.75rem;
+  color: var(--muted-text);
+  background: var(--background);
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+}
+
+.adjustmentRateRow {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.adjustmentCurrentPrice {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.adjustmentOriginalPrice {
+  font-size: 0.8rem;
+  color: var(--muted-text);
+  text-decoration: line-through;
+}
+
+.adjustmentVariance {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.adjustmentPeriod {
+  font-size: 0.74rem;
+  color: var(--muted-text);
+}
+
+.adjustmentActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btnViewAction {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnViewAction:hover {
+  border-color: var(--gold-text);
+  color: var(--gold-text);
+}
+
+.btnRollbackAction {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: #ef4444;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnRollbackAction:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+/* ==============================================================
+   F. COLLAPSIBLE PRICING HISTORY
+   ============================================================== */
+
+.historySection {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  overflow: hidden;
+}
+
+.historyToggleBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.15rem 1.4rem;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 0.96rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.historyToggleBtn:hover {
+  background: var(--background);
+}
+
+.historyList {
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1.4rem;
+  border-bottom: 1px solid var(--line);
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.historyItem:last-child {
+  border-bottom: none;
+}
+
+.historyItemLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.historyThumb {
+  width: 48px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #0f0e0d;
+  flex-shrink: 0;
+}
+
+.historyVehicleName {
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 0.88rem;
+}
+
+.historyPlate {
+  font-family: monospace;
+  color: var(--muted-text);
+  font-size: 0.76rem;
+  margin-left: 0.4rem;
+}
+
+.historyItemRight {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.historyPriceBadge {
+  font-weight: 700;
+  color: var(--gold-text);
+  font-size: 0.86rem;
+}
+
+.historyStatusBadge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+}
+
+.historyStatusActive {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+}
+
+.historyStatusRolledBack {
+  background: rgba(150, 150, 150, 0.12);
+  color: var(--muted-text);
+}
+
+.historyDate {
+  font-size: 0.76rem;
+  color: var(--muted-text);
+}
+
+/* ==============================================================
+   G. MODALS (TOGGLE CONFIRMATION & ROLLBACK)
+   ============================================================== */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: fadeIn 0.15s ease;
+}
+
+.modalBox {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modalTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.modalText {
+  font-size: 0.86rem;
+  color: var(--muted-text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.fieldLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-text);
+}
+
+.textInput {
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0.6rem 0.75rem;
+  color: var(--ink);
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.textInput:focus {
+  border-color: var(--gold-text);
+}
+
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btnSecondary {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  padding: 0.6rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  border-color: var(--muted-text);
+}
+
+.btnDanger {
+  background: #dc2626;
+  border: 1px solid #dc2626;
+  color: #ffffff;
+  padding: 0.6rem 1.15rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btnGold {
+  background: var(--gold-text);
+  border: 1px solid var(--gold-text);
+  color: #111111;
+  padding: 0.6rem 1.15rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+}
+
+.btnGold:hover:not(:disabled) {
+  background: #c79e49;
+}
+
+/* ==============================================================
+   RESPONSIVE DESIGN (ZERO HORIZONTAL OVERFLOW)
+   ============================================================== */
+
+@media (max-width: 1024px) {
+  .recGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .adjustmentsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .masterCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .masterRight {
+    width: 100%;
+  }
+
+  .toggleBtn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .recGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .adjustmentCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .adjustmentActions {
+    width: 100%;
+  }
+
+  .btnRollbackAction {
+    width: 100%;
+    text-align: center;
+  }
+
+  .historyItem {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .historyItemRight {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

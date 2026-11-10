@@ -59,6 +59,21 @@ function formatEur(amount: number | string) {
   }).format(Number(amount) || 0);
 }
 
+function formatHistoryStatus(status: string): string {
+  switch (status) {
+    case 'completed':
+      return 'Completed';
+    case 'cancelled_unpaid':
+      return 'Cancelled — Unpaid';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'rejected':
+      return 'Rejected';
+    default:
+      return status.replace(/_/g, ' ');
+  }
+}
+
 export default function AdminHistoryPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -175,12 +190,8 @@ export default function AdminHistoryPage() {
     <main className={styles.page}>
       {/* Header */}
       <div className={styles.headerBlock}>
-        <span className={styles.eyebrow}>LUXUAR · PRIVATE OFFICE · STAGE 08</span>
         <h1 className={styles.title}>Rental &amp; Deposit History</h1>
-        <p className={styles.subtitle}>
-          Immutable financial and operational audit trail: closed rentals, Stripe refunds, documented damage retentions, and cancelled requests.
-        </p>
-      </div>
+        </div>
 
       {/* Metrics */}
       <div className={styles.statsRow}>
@@ -253,7 +264,7 @@ export default function AdminHistoryPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className={styles.emptyState}>
-          <h2 style={{ fontFamily: 'var(--serif)', fontSize: '20px', color: 'var(--ink)' }}>
+          <h2 style={{ fontFamily: 'var(--admin-font-ui)', fontSize: '20px', color: 'var(--ink)' }}>
             No Records Found
           </h2>
           <p style={{ color: 'var(--muted)', fontSize: '13px' }}>
@@ -291,7 +302,7 @@ export default function AdminHistoryPage() {
                         : styles.statusRejected
                     }`}
                   >
-                    {r.status.replace('_', ' ').toUpperCase()}
+                    {formatHistoryStatus(r.status)}
                   </span>
                 </div>
 

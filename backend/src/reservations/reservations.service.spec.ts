@@ -95,6 +95,9 @@ describe('ReservationsService', () => {
         profilesRepository = {
             findOne: vi.fn().mockResolvedValue({
                 userId: 'customer-test-id',
+                licenseNumber: 'FR-99887766',
+                licenseCountry: 'France',
+                licenseIssuedOn: '2020-01-01',
 
                 // Le permis est valide pendant
                 // toute la période de location.
@@ -591,6 +594,21 @@ describe('ReservationsService', () => {
         'annule une réservation encore en attente',
         async () => {
             storedReservationWith({ status: ReservationStatus.PENDING });
+            manager.query.mockResolvedValue([]);
+
+            const result = await service.cancelMyReservation(
+                'customer-test-id',
+                'RES-2026-000001',
+            );
+
+            expect(result.status).toBe(ReservationStatus.CANCELLED);
+        },
+    );
+
+    it(
+        'annule une réservation en attente de paiement (BUG-005)',
+        async () => {
+            storedReservationWith({ status: ReservationStatus.AWAITING_PAYMENT });
             manager.query.mockResolvedValue([]);
 
             const result = await service.cancelMyReservation(

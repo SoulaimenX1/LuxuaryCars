@@ -47,16 +47,11 @@ export class NoShowService implements OnModuleInit, OnModuleDestroy {
     }
 
     async scanExpiredReservations(): Promise<number> {
-        while (this.activeScan) {
-            await this.activeScan.catch(() => undefined);
-        }
-        const scan = this.runScan();
-        this.activeScan = scan;
-        try {
-            return await scan;
-        } finally {
-            if (this.activeScan === scan) this.activeScan = undefined;
-        }
+        return this.runScan();
+    }
+
+    onModuleInit(): void {
+        this.startScheduler();
     }
 
     private async runScan(): Promise<number> {
@@ -229,11 +224,6 @@ export class NoShowService implements OnModuleInit, OnModuleDestroy {
     private async runScheduledTick(): Promise<void> {
         if (this.activeScan) return;
         await this.scanExpiredReservations().catch(() => undefined);
-    }
-
-    onModuleInit(): void {
-        if (this.config?.get<string>('NODE_ENV') === 'test') return;
-        this.startScheduler();
     }
 
     async onModuleDestroy(): Promise<void> {

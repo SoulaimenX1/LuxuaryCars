@@ -1,0 +1,655 @@
+/* ==========================================================
+   LUXUAR — DYNAMIC PRICING ADMIN CONTROL STYLES (SIMPLIFIED)
+   Strict: Zero horizontal scrollbars across all viewports.
+   Theme-adaptive: Porcelaine (Ivory/White) & Obsidienne (Charcoal/Dark)
+   ========================================================== */
+
+.card {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.75rem 2rem;
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 2rem;
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .card {
+    padding: 1.25rem 1rem;
+  }
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.headerText {
+  max-width: 680px;
+  min-width: 0;
+}
+
+.title {
+  font-family: var(--serif, Georgia, serif);
+  font-size: clamp(1.4rem, 2.5vw, 1.85rem);
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 0.4rem 0;
+  line-height: 1.25;
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.topLinksRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.analyticsLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  color: var(--gold-text);
+  background: var(--background);
+  border: 1px solid var(--line);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-field, 4px);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.analyticsLink:hover {
+  border-color: var(--gold-text);
+  background: var(--champagne-soft);
+}
+
+/* 1. Global ON/OFF Action Box */
+.actionRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: 1.25rem 1.4rem;
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  margin-bottom: 2rem;
+  min-width: 0;
+}
+
+.actionLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 640px;
+  min-width: 0;
+}
+
+.actionHeadingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.actionHeading {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.statusPillActive {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.statusPillInactive {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+}
+
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.statusPillActive .statusDot {
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+.statusPillInactive .statusDot {
+  background: #f59e0b;
+}
+
+.actionDescription {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+  line-height: 1.45;
+}
+
+.toggleBtn {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.75rem 1.4rem;
+  border-radius: var(--radius-button, 4px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.toggleActivate {
+  background: var(--gold-text);
+  border: 1px solid var(--gold-text);
+  color: #111111;
+}
+
+.toggleActivate:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.toggleDeactivate {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.toggleDeactivate:hover:not(:disabled) {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.toggleBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 2. Four Compact Rule Categories */
+.sectionTitle {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0 0 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ruleCountBadge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--gold-text);
+  background: var(--champagne-soft);
+  padding: 0.2rem 0.55rem;
+  border-radius: 12px;
+}
+
+.categoriesGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  margin-bottom: 2.25rem;
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .categoriesGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .categoriesGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.categoryCard {
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+  transition: border-color 0.2s ease;
+}
+
+.categoryCard:hover {
+  border-color: var(--gold-text);
+}
+
+.categoryTitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.categoryRates {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gold-text);
+}
+
+.categoryDesc {
+  font-size: 0.78rem;
+  color: var(--muted-text);
+  line-height: 1.4;
+}
+
+/* 3. Active Pricing Adjustments */
+.adjustmentsSection {
+  margin-bottom: 2.5rem;
+  min-width: 0;
+}
+
+.adjustmentsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.adjustmentCard {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-soft);
+  transition: border-color 0.2s ease;
+  min-width: 0;
+}
+
+.adjustmentCard:hover {
+  border-color: var(--gold-text);
+}
+
+.cardThumbRow {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #0f0e0d;
+  overflow: hidden;
+}
+
+.cardVehicleImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cardCategoryOverlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(0, 0, 0, 0.75);
+  color: #f8f6f2;
+  padding: 0.2rem 0.55rem;
+  border-radius: 3px;
+}
+
+.cardPlateOverlay {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-family: monospace;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--gold-text);
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+}
+
+.cardInfoBody {
+  padding: 1.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  justify-content: space-between;
+}
+
+.cardName {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.cardRatesRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: var(--background);
+  border-radius: 4px;
+}
+
+.rateCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.rateLabel {
+  font-size: 0.68rem;
+  color: var(--muted-text);
+  text-transform: uppercase;
+}
+
+.rateOriginal {
+  font-size: 0.85rem;
+  color: var(--muted-text);
+  text-decoration: line-through;
+}
+
+.rateApproved {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.varianceBadge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+}
+
+.variancePositive {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.varianceNegative {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.datesNote {
+  font-size: 0.75rem;
+  color: var(--muted-text);
+}
+
+.btnRollbackCard {
+  width: 100%;
+  padding: 0.6rem 0.9rem;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.btnRollbackCard:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.emptyStateCard {
+  background: var(--background);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted-text);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+/* 4. Compact Collapsible History Section */
+.historySection {
+  background: var(--background);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.15rem 1.35rem;
+  min-width: 0;
+}
+
+.historyHeaderBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: transparent;
+  border: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 0;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--line);
+}
+
+.historyItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 0.825rem;
+}
+
+.historyLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.historyThumb {
+  width: 44px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: #0f0e0d;
+}
+
+.historyName {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.historyStatusPill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted-text);
+  background: var(--line-soft);
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+}
+
+/* Modals */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.modalBox {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card, 6px);
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+.modalTitle {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.modalText {
+  font-size: 0.9rem;
+  color: var(--muted-text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.modalNotice {
+  background: var(--background);
+  border-left: 3px solid var(--gold-text);
+  padding: 0.75rem 1rem;
+  font-size: 0.825rem;
+  color: var(--ink);
+  border-radius: 0 4px 4px 0;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fieldLabel {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted-text);
+  text-transform: uppercase;
+}
+
+.textInput {
+  background: var(--background);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.85rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 4px;
+  outline: none;
+}
+
+.textInput:focus {
+  border-color: var(--gold-text);
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.btnCancel {
+  background: var(--background);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.65rem 1.1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnCancel:hover:not(:disabled) {
+  border-color: var(--gold-text);
+}
+
+.btnConfirm {
+  background: var(--gold-text);
+  border: 1px solid var(--gold-text);
+  color: #111111;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 0.65rem 1.25rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.btnConfirm:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.btnConfirmDanger {
+  background: #ef4444;
+  border: 1px solid #ef4444;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.65rem 1.25rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.btnConfirmDanger:hover:not(:disabled) {
+  opacity: 0.9;
+}

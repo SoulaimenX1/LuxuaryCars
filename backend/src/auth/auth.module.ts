@@ -24,6 +24,30 @@ import {
 } from './auth.service.js';
 
 import {
+  PasskeysController,
+} from './passkeys/passkeys.controller.js';
+
+import {
+  PasskeysService,
+} from './passkeys/passkeys.service.js';
+
+import {
+  PasskeyStorageService,
+} from './passkeys/passkey-storage.service.js';
+
+import {
+  MfaController,
+} from './mfa/mfa.controller.js';
+
+import {
+  MfaService,
+} from './mfa/mfa.service.js';
+
+import {
+  MfaGuard,
+} from './guards/mfa.guard.js';
+
+import {
   JwtAuthGuard,
 } from './guards/jwt-auth.guard.js';
 
@@ -76,10 +100,16 @@ import {
 
   controllers: [
     AuthController,
+    PasskeysController,
+    MfaController,
   ],
 
   providers: [
     AuthService,
+    PasskeysService,
+    PasskeyStorageService,
+    MfaService,
+    MfaGuard,
     JwtAuthGuard,
     RolesGuard,
 
@@ -94,6 +124,9 @@ import {
 
   exports: [
     AuthService,
+    PasskeysService,
+    MfaService,
+    MfaGuard,
     JwtModule,
     JwtAuthGuard,
     RolesGuard,

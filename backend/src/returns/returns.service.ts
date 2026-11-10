@@ -117,7 +117,7 @@ export class ReturnsService {
                     handover.fuel_level_pct AS "pickupFuel",
                     handover.overall_condition AS "pickupCondition",
                     handover.id AS "pickupInspectionId",
-                    assigned.id AS "assignedAgencyId",
+                    COALESCE(agency.id, credential.agency_id, assigned.id) AS "assignedAgencyId",
                     agency.name AS "assignedAgencyName",
                     agency.enabled AS "agencyEnabled",
                     agency.can_dropoff AS "agencyCanDropoff",

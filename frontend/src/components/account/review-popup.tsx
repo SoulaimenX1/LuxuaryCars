@@ -84,7 +84,7 @@ export default function ReviewPopup() {
     }
 
     void load();
-    return () => controller.abort();
+    return () => {};
   }, []);
 
   const resetForm = useCallback(() => {
@@ -127,9 +127,7 @@ export default function ReviewPopup() {
     const remaining = queue.slice(1);
     setQueue(remaining);
     resetForm();
-    if (remaining.length === 0) {
-      setOpen(false);
-    }
+    setOpen(false);
   }, [current, queue, resetForm, toast]);
 
   // ----------------------------------------------------------

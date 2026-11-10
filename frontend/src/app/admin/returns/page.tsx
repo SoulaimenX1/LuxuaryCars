@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
-import Link from 'next/link';
 import styles from './returns.module.css';
 import { useToast } from '@/components/toast';
 
@@ -281,12 +280,8 @@ export default function AdminReturnsPage() {
     <main className={styles.page}>
       {/* Header Block */}
       <div className={styles.headerBlock}>
-        <span className={styles.eyebrow}>LUXUAR · PRIVATE OFFICE · STAGE 07</span>
         <h1 className={styles.title}>Returns &amp; Security Deposits</h1>
-        <p className={styles.subtitle}>
-          Confirm physical vehicle return, document damage deductions with mandatory rationale, and execute verified Stripe deposit settlements.
-        </p>
-      </div>
+        </div>
 
       {/* Metrics Row */}
       <div className={styles.statsRow}>
@@ -399,17 +394,6 @@ export default function AdminReturnsPage() {
                   >
                     Confirm Return &amp; Settle →
                   </button>
-                  <Link
-                    href={`/reservations/${encodeURIComponent(r.reservationNumber)}`}
-                    style={{
-                      textAlign: 'center',
-                      fontSize: '11px',
-                      color: 'var(--muted)',
-                      textDecoration: 'none',
-                    }}
-                  >
-                    View Reservation Dossier
-                  </Link>
                 </div>
               </article>
             );
@@ -424,7 +408,7 @@ export default function AdminReturnsPage() {
             <div className={styles.modalHeader}>
               <div>
                 <span className={styles.eyebrow}>INSPECTION &amp; SETTLEMENT</span>
-                <h2 style={{ fontFamily: 'var(--serif)', fontSize: '22px', margin: '4px 0 0 0', color: 'var(--ink)' }}>
+                <h2 style={{ fontFamily: 'var(--admin-font-ui)', fontSize: '22px', margin: '4px 0 0 0', color: 'var(--ink)' }}>
                   Confirm Return &amp; Settle Deposit
                 </h2>
                 <p style={{ fontSize: '12.5px', color: 'var(--muted)', margin: '4px 0 0 0' }}>

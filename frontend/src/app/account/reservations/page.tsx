@@ -1,17 +1,49 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import styles from './reservations.module.css';
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Search,
+  X,
+  RefreshCw,
+  FileText,
+  CreditCard,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Check,
+  AlertCircle,
+  Car,
+  ShieldCheck,
+  ArrowRight,
+  Key,
+  Download,
+} from 'lucide-react';
 
+import styles from './reservations.module.css';
 import { Price } from '@/components/currency-provider';
-import { formatAmount } from '@/lib/format';
 import { useConfirm } from '@/components/confirm-dialog';
 import { useToast } from '@/components/toast';
+import {
+  type CustomerReservationCategory,
+  RESERVATION_CATEGORIES,
+  calculateCategoryCounts,
+  getDetailedStatusLabel,
+  getReservationCategory,
+  getReservationStepIndex,
+  getStatusExplanation,
+} from '@/lib/reservation-status';
+import RentalContractModal, {
+  type RentalContractData,
+} from '@/components/contract/RentalContractModal';
+import CheckInCodeModal from '@/components/account/CheckInCodeModal';
 
 // ==========================================================
-// TYPE DE RÉSERVATION RETOURNÉ PAR NESTJS
+// DATA TYPES
 // ==========================================================
 
 interface Reservation {
@@ -26,8 +58,8 @@ interface Reservation {
   totalAmount: string;
   status: string;
   createdAt: string;
-  pickupLocation?:string|null;dropoffLocation?:string|null;
-  // Horodatage du pré-enregistrement en ligne (check-in) s'il a eu lieu.
+  pickupLocation?: string | null;
+  dropoffLocation?: string | null;
   checkinAt?: string | null;
   noShowDeadlineAt?: string | null;
   agencyTimezone?: string | null;
@@ -42,17 +74,16 @@ interface Reservation {
   paymentDeadlineAt?: string | null;
   paymentUrl?: string | null;
   paidAt?: string | null;
-  handoverAt?: string | null;
-  handoverBy?: string | null;
-  handoverInspection?: Record<string, unknown> | null;
-  returnConfirmedAt?: string | null;
-  returnConfirmedBy?: string | null;
-  returnInspection?: Record<string, unknown> | null;
   depositRefundStatus?: string | null;
   depositRefundedAmount?: string | null;
   depositRetainedAmount?: string | null;
   depositRetentionReason?: string | null;
   stripeRefundId?: string | null;
+  // Backend direct enrichment
+  vehicleName?: string;
+  brandName?: string;
+  modelName?: string;
+  imageUrl?: string | null;
   returnSummary?: {
     reference: string;
     status: string;
@@ -74,8 +105,9 @@ interface CatalogVehicle {
   id: string;
   brandName: string;
   modelName: string;
+  categoryName?: string;
+  imageUrl?: string;
 }
-interface ApiError { message?: string | string[]; }
 
 interface FinancialPayment {
   id: string;
@@ -89,7 +121,7 @@ interface FinancialPayment {
 
 interface ReservationFinance {
   reservation: { id: string; totalAmount: string };
-  rental: { id: string } | null;
+  rental: { id: string; contractNumber?: string } | null;
   payments: FinancialPayment[];
   deposit: {
     status: string;
@@ -107,98 +139,79 @@ interface ReservationFinance {
 }
 
 // ==========================================================
-// OUTILS D'AFFICHAGE
+// FORMATTING HELPERS
 // ==========================================================
 
-function formatDate(value: string): string {
+function formatDate(value: string | null | undefined): string {
+  if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime())
     ? value
     : date.toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric',
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
       });
 }
 
-function formatAgencyDateTime(value: string, timezone: string): string {
+function formatDateTime(value: string | null | undefined, timezone = 'Europe/Paris'): string {
+  if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   try {
     return new Intl.DateTimeFormat('en-GB', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
       timeZone: timezone,
     }).format(date);
   } catch {
-    return date.toISOString();
+    return date.toISOString().slice(0, 16).replace('T', ' ');
   }
-}
-
-function reservationState(reservation: Reservation): string {
-  if (reservation.status === 'pending') return 'Pending approval';
-  if (reservation.status === 'awaiting_payment') return 'Awaiting payment';
-  if (reservation.status === 'confirmed') return 'Confirmed';
-  if (reservation.status === 'active_rental') return 'Active rental';
-  if (reservation.status === 'completed') return 'Completed';
-  if (reservation.status === 'cancelled_unpaid') return 'Cancelled (Unpaid)';
-  if (reservation.status === 'rejected') return 'Rejected';
-  if (reservation.status === 'cancelled') return 'Cancelled';
-  if (reservation.status === 'no_show') return 'No-Show';
-  if (reservation.status === 'converted') {
-    if (reservation.rentalStatus === 'active') return 'Active rental';
-    if (reservation.rentalStatus === 'closed') return 'Completed';
-    if (reservation.rentalStatus === 'returned') return 'Return processing';
-  }
-  return reservation.status.replaceAll('_', ' ');
-}
-
-async function readError(response: Response): Promise<string> {
-  try {
-    const error: ApiError = await response.json();
-    if (Array.isArray(error.message)) return error.message.join(' ');
-    if (typeof error.message === 'string') return error.message;
-  } catch {
-    // Réponse non JSON : garder l'erreur générique.
-  }
-  return `Request failed (HTTP ${response.status}).`;
-}
-
-function isReservation(value: unknown): value is Reservation {
-  if (typeof value !== 'object' || value === null) return false;
-  const item = value as Partial<Reservation>;
-  return typeof item.reservationNumber === 'string' &&
-    typeof item.vehicleId === 'string' &&
-    typeof item.pickupAt === 'string' &&
-    typeof item.returnAt === 'string' &&
-    typeof item.status === 'string' &&
-    typeof item.totalAmount === 'string';
 }
 
 // ==========================================================
-// PAGE /account/reservations
+// PAGE COMPONENT
 // ==========================================================
 
 export default function MyReservationsPage() {
   const router = useRouter();
   const confirm = useConfirm();
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [vehicleNames, setVehicleNames] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [busyNumber, setBusyNumber] = useState<string | null>(null);
-  const [financialByReservation, setFinancialByReservation] =
-    useState<Record<string, ReservationFinance>>({});
-  const [financialError, setFinancialError] = useState('');
-
   const toast = useToast();
 
-  // Heure courante conservée dans un state.
-  // Cela évite d'appeler Date.now() directement pendant le rendu.
-  const [currentTime, setCurrentTime] =
-    useState<number | null>(null);
+  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [vehicleCatalog, setVehicleCatalog] = useState<Record<string, CatalogVehicle>>({});
+  const [financialByReservation, setFinancialByReservation] = useState<Record<string, ReservationFinance>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyNumber, setBusyNumber] = useState<string | null>(null);
+  const [copiedNumber, setCopiedNumber] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
+
+  // Filters UI: ALL or one of the strict 6 categories
+  const [selectedCategory, setSelectedCategory] = useState<CustomerReservationCategory | 'ALL'>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortOrder, setSortOrder] = useState<
+    'pickup_nearest' | 'created_newest' | 'amount_highest' | 'pickup_latest'
+  >('pickup_nearest');
+  const [expandedDossier, setExpandedDossier] = useState<Record<string, boolean>>({});
+
+  // Contract Modal state
+  const [activeContract, setActiveContract] = useState<RentalContractData | null>(null);
+
+  // Check-In Pass Modal state
+  const [checkinPass, setCheckinPass] = useState<{
+    reservationNumber: string;
+    vehicleName: string;
+    code: string;
+    expiresAt: string;
+    agencyName: string;
+  } | null>(null);
 
   // ========================================================
-  // CHARGER UNIQUEMENT LES RÉSERVATIONS DU CLIENT CONNECTÉ
+  // LOAD REAL DATA
   // ========================================================
 
   const loadReservations = useCallback(async (signal?: AbortSignal) => {
@@ -206,160 +219,192 @@ export default function MyReservationsPage() {
     setError('');
 
     try {
-      // GET /api/reservations transmet à NestJS GET /reservations/me.
+      // 1. Fetch real reservations
       const response = await fetch('/api/reservations', {
-        method: 'GET', cache: 'no-store', signal,
+        method: 'GET',
+        cache: 'no-store',
+        signal,
       });
 
       if (response.status === 401) {
         router.replace('/login');
         return;
       }
-      if (!response.ok) throw new Error(await readError(response));
 
-      const data: unknown = await response.json();
-      if (!Array.isArray(data) || !data.every(isReservation)) {
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.message || `Unable to load reservations (HTTP ${response.status}).`);
+      }
+
+      const rawData: unknown = await response.json();
+      if (!Array.isArray(rawData)) {
         throw new Error('Invalid reservations response.');
       }
 
-      // Afficher les réservations les plus récentes en premier.
-      const sorted = [...data].sort((a, b) =>
-        Date.parse(b.createdAt) - Date.parse(a.createdAt),
-      );
-      if (!signal?.aborted) setReservations(sorted);
-
-      try {
-        setFinancialError('');
-        const financialResponse = await fetch('/api/finance/me/reservations', {
-          method: 'GET', cache: 'no-store', signal,
-        });
-        if (financialResponse.status === 401) {
-          router.replace('/login');
-          return;
-        }
-        if (!financialResponse.ok) {
-          throw new Error(await readError(financialResponse));
-        }
-        const summaries: unknown = await financialResponse.json();
-        if (!Array.isArray(summaries)) {
-          throw new Error('Invalid financial summary response.');
-        }
-        const summariesById: Record<string, ReservationFinance> = {};
-        for (const value of summaries) {
-          const summary = value as Partial<ReservationFinance>;
-          if (typeof summary.reservation?.id === 'string') {
-            summariesById[summary.reservation.id] =
-              summary as ReservationFinance;
-          }
-        }
-        if (!signal?.aborted) setFinancialByReservation(summariesById);
-      } catch (caught) {
-        if (!signal?.aborted) {
-          setFinancialError(
-            caught instanceof Error
-              ? caught.message
-              : 'Unable to load financial information.',
-          );
-        }
+      const list = rawData as Reservation[];
+      list.sort((a, b) => Date.parse(b.createdAt || '') - Date.parse(a.createdAt || ''));
+      if (!signal?.aborted) {
+        setReservations(list);
       }
 
-      // Enrichissement purement visuel : nom du véhicule si présent
-      // dans le catalogue public. Son absence ne bloque pas la page.
+      // 2. Fetch financial summaries in background
       try {
-        const catalogResponse = await fetch('/api/vehicles/catalog', {
-          method: 'GET', cache: 'no-store', signal,
+        const finResponse = await fetch('/api/finance/me/reservations', {
+          method: 'GET',
+          cache: 'no-store',
+          signal,
         });
-        if (catalogResponse.ok) {
-          const catalog: unknown = await catalogResponse.json();
-          if (Array.isArray(catalog)) {
-            const names: Record<string, string> = {};
-            for (const item of catalog) {
-              const vehicle = item as Partial<CatalogVehicle>;
-              if (
-                typeof vehicle.id === 'string' &&
-                typeof vehicle.brandName === 'string' &&
-                typeof vehicle.modelName === 'string'
-              ) {
-                names[vehicle.id] = `${vehicle.brandName} ${vehicle.modelName}`;
+        if (finResponse.ok) {
+          const summaries: unknown = await finResponse.json();
+          if (Array.isArray(summaries)) {
+            const map: Record<string, ReservationFinance> = {};
+            for (const item of summaries) {
+              const fin = item as ReservationFinance;
+              if (fin.reservation?.id) {
+                map[fin.reservation.id] = fin;
               }
             }
-            if (!signal?.aborted) setVehicleNames(names);
+            if (!signal?.aborted) {
+              setFinancialByReservation(map);
+            }
           }
         }
       } catch {
-        // Le catalogue n'est pas obligatoire pour voir l'historique.
+        // Non-blocking secondary data
+      }
+
+      // 3. Fetch catalog for vehicle images and details
+      try {
+        const catResponse = await fetch('/api/vehicles/catalog', {
+          method: 'GET',
+          cache: 'no-store',
+          signal,
+        });
+        if (catResponse.ok) {
+          const catData: unknown = await catResponse.json();
+          if (Array.isArray(catData)) {
+            const map: Record<string, CatalogVehicle> = {};
+            for (const item of catData) {
+              const v = item as CatalogVehicle;
+              if (v.id) {
+                map[v.id] = v;
+              }
+            }
+            if (!signal?.aborted) {
+              setVehicleCatalog(map);
+            }
+          }
+        }
+      } catch {
+        // Non-blocking catalog
       }
     } catch (caught) {
       if (!signal?.aborted) {
-        setError(
-          caught instanceof Error ? caught.message : 'Unable to load reservations.',
-        );
+        setError(caught instanceof Error ? caught.message : 'Unable to load reservations.');
       }
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (!signal?.aborted) {
+        setLoading(false);
+      }
     }
   }, [router]);
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    // React 19 déconseille un setState déclenché
-    // synchroniquement depuis le corps de l'effet.
-    // On démarre donc le chargement dans une tâche asynchrone.
-    const timerId = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       setCurrentTime(Date.now());
-
-      void loadReservations(
-        controller.signal,
-      );
+      void loadReservations();
     }, 0);
 
-    // Mettre à jour l'heure une fois par minute
-    // afin que le bouton Cancel reste cohérent.
-    const intervalId = window.setInterval(
-      () => {
-        setCurrentTime(Date.now());
-      },
-      60_000,
-    );
+    const interval = window.setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60_000);
 
     return () => {
-      window.clearTimeout(timerId);
-      window.clearInterval(intervalId);
-      controller.abort();
+      window.clearTimeout(timer);
+      window.clearInterval(interval);
     };
   }, [loadReservations]);
 
   // ========================================================
-  // ANNULER UNE RÉSERVATION (pending ou confirmed)
+  // STRICT 6-CATEGORY REAL COUNTERS
+  // ========================================================
+
+  const categoryCounts = useMemo(() => {
+    return calculateCategoryCounts(reservations);
+  }, [reservations]);
+
+  // ========================================================
+  // FILTERING & SEARCH
+  // ========================================================
+
+  const filteredReservations = useMemo(() => {
+    const list = reservations.filter((reservation) => {
+      const category = getReservationCategory(reservation);
+
+      // 1. Status Category filter
+      if (selectedCategory !== 'ALL' && category !== selectedCategory) {
+        return false;
+      }
+
+      // 2. Search query by reference or vehicle
+      if (searchQuery.trim()) {
+        const query = searchQuery.trim().toLowerCase();
+        const ref = (reservation.reservationNumber || '').toLowerCase();
+        const catVehicle = vehicleCatalog[reservation.vehicleId];
+        const vName = (
+          reservation.vehicleName ||
+          (catVehicle ? `${catVehicle.brandName} ${catVehicle.modelName}` : '')
+        ).toLowerCase();
+
+        if (!ref.includes(query) && !vName.includes(query)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    return list.sort((a, b) => {
+      switch (sortOrder) {
+        case 'pickup_nearest':
+          return Date.parse(a.pickupAt) - Date.parse(b.pickupAt);
+        case 'pickup_latest':
+          return Date.parse(b.pickupAt) - Date.parse(a.pickupAt);
+        case 'amount_highest':
+          return Number(b.totalAmount) - Number(a.totalAmount);
+        case 'created_newest':
+        default:
+          return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+      }
+    });
+  }, [reservations, selectedCategory, searchQuery, sortOrder, vehicleCatalog]);
+
+  // ========================================================
+  // CANCELLATION ACTION
   // ========================================================
 
   async function handleCancel(reservation: Reservation) {
     if (busyNumber) return;
-    const cancellableStatus =
-      reservation.status === 'pending' ||
-      reservation.status === 'confirmed';
-    if (
-      !cancellableStatus ||
-      currentTime === null ||
-      Date.parse(reservation.pickupAt) <=
-        currentTime
-    ) {
-      return;
-    }
 
-    // Confirmation explicite avant modification en base.
+    const cancellable =
+      (reservation.status === 'pending' ||
+        reservation.status === 'awaiting_payment' ||
+        reservation.status === 'confirmed') &&
+      currentTime !== null &&
+      Date.parse(reservation.pickupAt) > currentTime;
+
+    if (!cancellable) return;
+
     const confirmed = await confirm({
-      title: 'Cancel reservation',
-      message: `Reservation ${reservation.reservationNumber} will be cancelled. This action cannot be undone from your account.`,
-      confirmLabel: 'Yes, cancel it',
-      cancelLabel: 'Keep reservation',
+      title: 'Cancel Reservation',
+      message: `Are you sure you want to cancel reservation ${reservation.reservationNumber}? This action cannot be undone.`,
+      confirmLabel: 'Yes, Cancel Reservation',
+      cancelLabel: 'Keep Reservation',
       tone: 'danger',
     });
+
     if (!confirmed) return;
 
-    setError('');
-    setSuccess('');
     setBusyNumber(reservation.reservationNumber);
 
     try {
@@ -372,396 +417,649 @@ export default function MyReservationsPage() {
         router.replace('/login');
         return;
       }
-      if (!response.ok) throw new Error(await readError(response));
 
-      // Recharger la liste réelle depuis NestJS après l'annulation.
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || `HTTP ${response.status}`);
+      }
+
+      toast.success(
+        `Reservation ${reservation.reservationNumber} has been cancelled.`,
+        'Reservation Cancelled',
+      );
       await loadReservations();
-      const message = `Reservation ${reservation.reservationNumber} cancelled.`;
-      setSuccess(message);
-      toast.success(message, 'Reservation cancelled');
     } catch (caught) {
-      const message =
-        caught instanceof Error ? caught.message : 'Unable to cancel reservation.';
-      setError(message);
-      toast.error(message, 'Reservation');
+      toast.error(
+        caught instanceof Error ? caught.message : 'Unable to cancel reservation.',
+        'Cancellation Failed',
+      );
     } finally {
       setBusyNumber(null);
     }
   }
 
+  // ========================================================
+  // ONLINE CHECK-IN ACTION
+  // ========================================================
+
+  async function handleOnlineCheckIn(reservation: Reservation, vName: string) {
+    if (busyNumber) return;
+    setBusyNumber(reservation.reservationNumber);
+
+    try {
+      const response = await fetch(
+        `/api/reservations/by-number/${encodeURIComponent(reservation.reservationNumber)}/check-in-code`,
+        { method: 'POST' },
+      );
+
+      if (response.status === 401) {
+        router.replace('/login');
+        return;
+      }
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Check-in pass is currently unavailable.');
+      }
+
+      setCheckinPass({
+        reservationNumber: reservation.reservationNumber,
+        vehicleName: vName,
+        code: data.code,
+        expiresAt: data.expiresAt,
+        agencyName: data.agencyName,
+      });
+
+      toast.success('Your vehicle collection pass has been issued.', 'Check-In Ready');
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Check-in unavailable.',
+        'Online Check-In',
+      );
+    } finally {
+      setBusyNumber(null);
+    }
+  }
 
   // ========================================================
-  // INTERFACE
+  // CONTRACT MODAL HANDLER
   // ========================================================
 
-  const statusOrder = [
-    'Pending approval',
-    'Awaiting payment',
-    'Confirmed',
-    'Active rental',
-    'Completed',
-    'Cancelled (Unpaid)',
-    'Cancelled',
-    'Rejected',
-    'No-Show',
-  ];
+  function handleOpenContract(
+    reservation: Reservation,
+    vName: string,
+    brandName: string,
+    modelName: string,
+    imgUrl?: string | null,
+  ) {
+    const fin = financialByReservation[reservation.id];
+    const rentalId = fin?.rental?.id;
+    const contractNumber = fin?.rental?.contractNumber || `CTR-${reservation.reservationNumber.replace('RES-', '')}`;
 
-  const statusCounts = reservations.reduce<
-    Record<string, number>
-  >((accumulator, reservation) => {
-    const state = reservationState(reservation);
-    accumulator[state] = (accumulator[state] ?? 0) + 1;
-    return accumulator;
-  }, {});
+    setActiveContract({
+      contractNumber,
+      reservationNumber: reservation.reservationNumber,
+      rentalId,
+      vehicleName: vName,
+      brandName,
+      modelName,
+      imageUrl: imgUrl,
+      customerName: 'Valued Client',
+      pickupAt: reservation.pickupAt,
+      returnAt: reservation.returnAt,
+      pickupLocation: reservation.pickupLocation,
+      dropoffLocation: reservation.dropoffLocation,
+      rentalDays: reservation.rentalDays,
+      dailyPrice: reservation.dailyPrice,
+      totalAmount: reservation.totalAmount,
+      depositAmount: reservation.depositAmount,
+      paymentStatus: fin?.paymentStatus?.replaceAll('_', ' '),
+      invoiceNumber: fin?.invoices?.[0]?.invoiceNumber,
+    });
+  }
+
+  function handleCopyReference(ref: string) {
+    navigator.clipboard.writeText(ref).catch(() => null);
+    setCopiedNumber(ref);
+    setTimeout(() => setCopiedNumber(null), 2000);
+  }
+
+  function toggleDossier(id: string) {
+    setExpandedDossier((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  }
+
+  // ========================================================
+  // MAIN RENDER
+  // ========================================================
 
   return (
     <main className={styles.page}>
-      <section className={styles.container}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
-          <Link href="/account" className={styles.back} style={{ marginBottom: 0 }}>← Back to account</Link>
-          <Link
-            href="/account/payments"
-            className={styles.topPaymentsCta}
-          >
-            My payments &amp; deposits
-            <span aria-hidden="true">→</span>
-          </Link>
-        </div>
-        <p className={styles.eyebrow}>CUSTOMER AREA</p>
-        <h1>My reservations</h1>
-        <p className={styles.intro}>
-          Track your luxury car bookings and manage eligible pending requests.
-        </p>
+      <div className={styles.container}>
 
-        {!loading && reservations.length > 0 && (
-          <div className={styles.summary}>
-            {statusOrder.map((status) => (
-              <div
-                key={status}
-                className={styles.summaryItem}
+        {/* Top Navigation Bar */}
+        <div className={styles.topBar}>
+          <Link href="/account" className={styles.backLink}>
+            ← Back to Private Salon
+          </Link>
+
+          <div className={styles.topActions}>
+            <Link href="/account/payments" className={styles.paymentsCta}>
+              <CreditCard size={14} />
+              Payments &amp; Deposits
+            </Link>
+
+            <Link href="/account/rentals" className={styles.paymentsCta}>
+              <Car size={14} />
+              My Rentals
+            </Link>
+
+            <button
+              type="button"
+              className={styles.refreshButton}
+              title="Refresh reservations"
+              disabled={loading}
+              onClick={() => void loadReservations()}
+            >
+              <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+
+        {/* Page Header */}
+        <header className={styles.header}>
+          <span className={styles.eyebrow}>CONCIERGE PORTFOLIO</span>
+          <h1 className={styles.title}>My Reservations</h1>
+          <p className={styles.subtitle}>
+            Monitor your luxury car bookings, concierge approval stages, payment guarantees, and handover dossiers in real time.
+          </p>
+        </header>
+
+        {/* Status Category Filter Cards (Strict 6 Categories + All) */}
+        <section className={styles.statusOverview} aria-label="Reservation status categories">
+          <button
+            type="button"
+            className={`${styles.statusCard} ${selectedCategory === 'ALL' ? styles.active : ''}`}
+            onClick={() => setSelectedCategory('ALL')}
+          >
+            <span className={styles.statusCardCount}>{reservations.length}</span>
+            <span className={styles.statusCardLabel}>All Reservations</span>
+          </button>
+
+          {RESERVATION_CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              data-category={cat}
+              className={`${styles.statusCard} ${selectedCategory === cat ? styles.active : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              <span className={styles.statusCardCount}>{categoryCounts[cat]}</span>
+              <span className={styles.statusCardLabel}>{cat}</span>
+            </button>
+          ))}
+        </section>
+
+        {/* Search & Toolbar */}
+        <div className={styles.toolbar}>
+          <div className={styles.searchBox}>
+            <Search size={16} className={styles.searchIcon} />
+            <input
+              type="text"
+              placeholder="Search by reference (e.g. RES-2026) or vehicle..."
+              className={styles.searchInput}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                className={styles.clearSearch}
+                title="Clear search"
+                onClick={() => setSearchQuery('')}
               >
-                <strong>
-                  {statusCounts[status] ?? 0}
-                </strong>
-                <span>{status}</span>
+                <X size={14} />
+              </button>
+            )}
+          </div>
+
+          <div className={styles.sortGroup}>
+            <span className={styles.sortLabel}>Sort:</span>
+            <select
+              value={sortOrder}
+              onChange={(e) =>
+                setSortOrder(
+                  e.target.value as
+                    | 'pickup_nearest'
+                    | 'created_newest'
+                    | 'amount_highest'
+                    | 'pickup_latest',
+                )
+              }
+              className={styles.sortSelect}
+              aria-label="Sort reservations"
+            >
+              <option value="pickup_nearest">Nearest Pickup Date</option>
+              <option value="created_newest">Newest Booking First</option>
+              <option value="amount_highest">Highest Total Value</option>
+              <option value="pickup_latest">Furthest Pickup Date</option>
+            </select>
+          </div>
+
+          <div className={styles.toolbarMeta}>
+            {selectedCategory !== 'ALL' && (
+              <span className={styles.activeFilterPill}>
+                Category: {selectedCategory}
+                <X
+                  size={12}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => setSelectedCategory('ALL')}
+                />
+              </span>
+            )}
+            <span>
+              Showing <strong>{filteredReservations.length}</strong> of {reservations.length}
+            </span>
+          </div>
+        </div>
+
+        {/* Error Banner */}
+        {error && (
+          <div className={styles.errorBanner} role="alert">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <AlertCircle size={18} />
+              <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              className={styles.secondaryAction}
+              onClick={() => void loadReservations()}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Skeletons Loading */}
+        {loading && reservations.length === 0 ? (
+          <div className={styles.list}>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className={styles.skeletonCard}>
+                <div className={styles.skeletonPulse} />
               </div>
             ))}
           </div>
-        )}
-
-        {error && <div className={styles.error} role="alert">{error}</div>}
-        {success && <div className={styles.success} role="status">{success}</div>}
-        {financialError && (
-          <div className={styles.error} role="alert">
-            Financial details are temporarily unavailable: {financialError}
-          </div>
-        )}
-
-        {loading ? (
-          <div className={styles.notice}>Loading your reservations...</div>
-        ) : reservations.length === 0 && !error ? (
-          <div className={styles.empty}>
-            <h2>No reservations yet</h2>
-            <p>Your bookings will appear here after you make a reservation.</p>
-            <Link href="/vehicles" className={styles.primaryLink}>
-              Browse the fleet →
-            </Link>
+        ) : filteredReservations.length === 0 ? (
+          /* Empty State */
+          <div className={styles.emptyCard}>
+            <Car className={styles.emptyIcon} />
+            <h2 className={styles.emptyTitle}>
+              {searchQuery || selectedCategory !== 'ALL'
+                ? 'No matching reservations'
+                : 'No reservations in your private garage yet'}
+            </h2>
+            <p className={styles.emptyText}>
+              {searchQuery || selectedCategory !== 'ALL'
+                ? 'Try adjusting your search criteria or selecting a different status filter.'
+                : 'Experience the world’s most exhilarating supercars and grand tourers. Browse our collection and reserve your journey.'}
+            </p>
+            {searchQuery || selectedCategory !== 'ALL' ? (
+              <button
+                type="button"
+                className={styles.emptyCta}
+                onClick={() => {
+                  setSelectedCategory('ALL');
+                  setSearchQuery('');
+                }}
+              >
+                Reset Filters
+              </button>
+            ) : (
+              <Link href="/vehicles" className={styles.emptyCta}>
+                Browse Fleet <ArrowRight size={14} />
+              </Link>
+            )}
           </div>
         ) : (
+          /* Reservation Cards List */
           <div className={styles.list}>
-            {reservations.map((reservation) => {
+            {filteredReservations.map((reservation) => {
+              const catVehicle = vehicleCatalog[reservation.vehicleId];
+              const brandName = reservation.brandName || catVehicle?.brandName || 'Luxury';
+              const modelName = reservation.modelName || catVehicle?.modelName || 'Supercar';
+              const vehicleImage = reservation.imageUrl || catVehicle?.imageUrl || null;
+              const categoryTag = catVehicle?.categoryName || 'Exclusive Collection';
+              const vName = reservation.vehicleName || `${brandName} ${modelName}`;
+
+              const statusMeta = getDetailedStatusLabel(reservation);
+              const stepInfo = getReservationStepIndex(reservation);
+
               const canCancel =
                 currentTime !== null &&
                 (reservation.status === 'pending' ||
+                  reservation.status === 'awaiting_payment' ||
                   reservation.status === 'confirmed') &&
-                Date.parse(reservation.pickupAt) >
-                  currentTime;
-              const statusClass = reservation.status === 'pending'
-                ? styles.pending
-                : reservation.status === 'awaiting_payment'
-                  ? styles.awaitingPayment
-                  : reservation.status === 'confirmed'
-                    ? styles.confirmed
-                    : reservation.status === 'active_rental'
-                      ? styles.activeRental
-                      : reservation.status === 'completed'
-                        ? styles.completed
-                        : reservation.status === 'cancelled_unpaid'
-                          ? styles.cancelledUnpaid
-                          : styles.otherStatus;
+                Date.parse(reservation.pickupAt) > currentTime;
+
+              const isAwaitingPayment = reservation.status === 'awaiting_payment';
+              const isConfirmed = reservation.status === 'confirmed';
+              const isActiveRental =
+                reservation.status === 'active_rental' ||
+                (reservation.status === 'converted' && reservation.rentalStatus === 'active');
+              const isCompleted =
+                reservation.status === 'completed' ||
+                (reservation.status === 'converted' && reservation.rentalStatus === 'closed');
+              const isRejected = statusMeta.category === 'Rejected';
+
+              const finance = financialByReservation[reservation.id];
+              const isDossierOpen = !!expandedDossier[reservation.id];
 
               return (
-                <article className={styles.card} key={reservation.reservationNumber}>
-                  <div className={styles.cardTop}>
-                    <div>
-                      <p className={styles.cardLabel}>RESERVATION NUMBER</p>
-                      <h2>{reservation.reservationNumber}</h2>
-                    </div>
-                    <span className={`${styles.status} ${statusClass}`}>
-                      {reservationState(reservation)}
-                    </span>
-                  </div>
+                <article key={reservation.id || reservation.reservationNumber} className={styles.card}>
+                  <div className={styles.cardMain}>
 
-                  {reservation.status === 'awaiting_payment' && (
-                    <div className={styles.paymentCallout}>
-                      <div className={styles.paymentCalloutInfo}>
-                        <span className={styles.paymentCalloutBadge}>Action Required · 24-Hour Guarantee Window</span>
-                        <h3>Booking Approved — Payment Required</h3>
-                        <p>
-                          Your reservation request has been approved by LUXUAR Concierge. Please complete your rental payment and security deposit to guarantee collection.
-                        </p>
-                        {reservation.paymentDeadlineAt && (
-                          <div className={styles.deadlineNoteText}>
-                            Payment window expires: <strong>{formatAgencyDateTime(reservation.paymentDeadlineAt, reservation.agencyTimezone || 'Europe/Paris')}</strong>
-                          </div>
-                        )}
-                      </div>
-                      <Link
-                        href={`/account/payments/${encodeURIComponent(reservation.reservationNumber)}`}
-                        className={styles.payNowButton}
-                      >
-                        Pay Rental &amp; Deposit (Stripe) →
-                      </Link>
-                    </div>
-                  )}
-
-                  {reservation.status === 'active_rental' && (
-                    <div className={styles.activeRentalCallout}>
-                      <div>
-                        <span className={styles.calloutTag}>Active Rental · Vehicle In Custody</span>
-                        <h3>Vehicle Handed Over</h3>
-                        <p>
-                          Your luxury rental is currently active. Scheduled return is {formatDate(reservation.returnAt)}.
-                        </p>
-                      </div>
-                      <Link
-                        href={`/reservations/${encodeURIComponent(reservation.reservationNumber)}`}
-                        className={styles.actionPill}
-                      >
-                        Inspection &amp; Rental Hub →
-                      </Link>
-                    </div>
-                  )}
-
-                  {reservation.status === 'completed' && (
-                    <div className={styles.completedCallout}>
-                      <div>
-                        <span className={styles.calloutTag}>Rental Closed · Inspection Completed</span>
-                        <h3>Return Confirmed</h3>
-                        <p>
-                          Vehicle returned successfully.{' '}
-                          {reservation.depositRefundStatus === 'fully_refunded' && 'Full security deposit refund has been issued to your payment card via Stripe.'}
-                          {reservation.depositRefundStatus === 'partially_refunded' && `Partial deposit refund issued: €${formatAmount(reservation.depositRefundedAmount)} refunded, €${formatAmount(reservation.depositRetainedAmount)} retained.`}
-                          {reservation.depositRefundStatus === 'retained' && `Security deposit retained for charges: €${formatAmount(reservation.depositRetainedAmount)}.`}
-                        </p>
-                      </div>
-                      <Link
-                        href={`/reservations/${encodeURIComponent(reservation.reservationNumber)}`}
-                        className={styles.actionPill}
-                      >
-                        View Return Dossier →
-                      </Link>
-                    </div>
-                  )}
-
-                  <div className={styles.dataGrid}>
-                    <div>
-                      <span>Vehicle</span>
-                      <strong>{vehicleNames[reservation.vehicleId] || 'Luxury vehicle'}</strong>
-                      <small>ID: {reservation.vehicleId}</small>
-                    </div>
-                    <div><span>Rental start</span><strong>{formatDate(reservation.pickupAt)}</strong></div>
-                    {reservation.rentalStartedAt && (
-                      <div>
-                        <span>Actual collection</span>
-                        <strong>{formatAgencyDateTime(
-                          reservation.rentalStartedAt,
-                          reservation.agencyTimezone || 'Europe/Paris',
-                        )}</strong>
-                      </div>
-                    )}
-                    <div><span>Rental end</span><strong>{formatDate(reservation.returnAt)}</strong></div>
-                    <div><span>Rental days</span><strong>{reservation.rentalDays}</strong></div>
-                    <div><span>Daily rate</span><strong><Price value={reservation.dailyPrice} /></strong></div>
-                    <div><span>Rental total</span><strong><Price value={reservation.totalAmount} /></strong></div>
-                    <div><span>Security deposit</span><strong><Price value={reservation.depositAmount} /></strong></div>
-                    {reservation.status === 'confirmed' && reservation.noShowDeadlineAt && (
-                      <div className={styles.deadlineNote}>
-                        <span>Agency collection deadline</span>
-                        <strong>{formatAgencyDateTime(
-                          reservation.noShowDeadlineAt,
-                          reservation.agencyTimezone || 'Europe/Paris',
-                        )}</strong>
-                        <small>Please complete vehicle handover by this time. Without a recorded handover, the reservation expires automatically.</small>
-                      </div>
-                    )}
-                    {reservation.status === 'no_show' && (
-                      <div className={styles.deadlineNote}>
-                        <span>No-Show recorded</span>
-                        <strong>{reservation.noShowAt ? formatAgencyDateTime(
-                          reservation.noShowAt,
-                          reservation.agencyTimezone || 'Europe/Paris',
-                        ) : 'Collection deadline missed'}</strong>
-                        {reservation.noShowReason && <small>{reservation.noShowReason}</small>}
-                      </div>
-                    )}
-                    {reservation.status === 'active_rental' && (
-                      <div>
-                        <span>Rental Status</span>
-                        <strong>Active Rental · Vehicle Handed Over</strong>
-                      </div>
-                    )}
-                  </div>
-
-                  {(() => {
-                    const finance = financialByReservation[reservation.id];
-                    if (!finance) {
-                      return (
-                        <section className={styles.financialPanel} aria-label="Reservation finances">
-                          <div className={styles.financialHeading}>
-                            <h3>Financial overview</h3>
-                            <span>Details unavailable</span>
-                          </div>
-                          <p>Financial history could not be loaded. Please refresh or contact the agency; no payment status is assumed.</p>
-                        </section>
-                      );
-                    }
-                    return (
-                      <section className={styles.financialPanel} aria-label="Reservation finances">
-                        <div className={styles.financialHeading}>
-                          <h3>Financial overview</h3>
-                          <span>{finance.paymentStatus.replaceAll('_', ' ')}</span>
-                        </div>
-                        <div className={styles.financialGrid}>
-                          <div><span>Total rental price</span><strong><Price value={reservation.totalAmount} /></strong></div>
-                          <div><span>Amount paid</span><strong><Price value={finance.amountPaidEur} /></strong></div>
-                          <div><span>Remaining balance</span><strong><Price value={finance.outstandingEur} /></strong></div>
-                          <div><span>Required security deposit</span><strong><Price value={finance.deposit.requiredAmount} /></strong></div>
-                          <div><span>Deposit received</span><strong><Price value={finance.deposit.receivedAmount} /></strong></div>
-                          <div><span>Deposit outstanding</span><strong><Price value={finance.deposit.outstandingAmount} /></strong></div>
-                          <div><span>Deposit status</span><strong>{finance.deposit.status.replaceAll('_', ' ')}</strong></div>
-                          <div><span>Refunded / retained</span><strong><Price value={finance.deposit.refundedAmount} /> / <Price value={finance.deposit.retainedAmount} /></strong></div>
-                        </div>
-                        {finance.deposit.retentionReason && (
-                          <p>Deposit retention reason: {finance.deposit.retentionReason}</p>
-                        )}
-                        <div className={styles.financialHistory}>
-                          <h4>Payment history</h4>
-                          {finance.payments.length === 0
-                            ? <p>No payments have been recorded.</p>
-                            : finance.payments.map(payment => (
-                              <div key={payment.id}>
-                                <span>{payment.type.replaceAll('_', ' ')} · {formatDate(payment.paidAt)} · {payment.method} · Ref. {payment.reference || '—'}</span>
-                                <strong><Price value={payment.amount} /></strong>
-                                <a href={`/api/finance/me/payments/${payment.id}/receipt`}>Receipt</a>
-                              </div>
-                            ))}
-                        </div>
-                        {(finance.rental || finance.invoices.length > 0) && (
-                          <div className={styles.financialDocuments}>
-                            <h4>Documents</h4>
-                            {finance.rental && (
-                              <a href={`/api/finance/me/${finance.rental.id}/documents/contract`}>Rental contract</a>
-                            )}
-                            {finance.invoices.map(invoice => finance.rental && (
-                              <a key={invoice.id} href={`/api/finance/me/${finance.rental.id}/documents/invoice`}>
-                                Invoice {invoice.invoiceNumber} · <Price value={invoice.totalAmount} />
-                              </a>
-                            ))}
-                          </div>
-                        )}
-                      </section>
-                    );
-                  })()}
-
-                  {(reservation.returnSummary || reservation.rentalStatus === 'returned' || reservation.rentalStatus === 'closed') && (
-                    <section className={styles.financialPanel} aria-label="Vehicle return summary">
-                      <div className={styles.financialHeading}>
-                        <h3>Vehicle return</h3>
-                        <span>{reservation.returnSummary?.status.replaceAll('_', ' ') ?? 'Summary unavailable'}</span>
-                      </div>
-                      {reservation.returnSummary ? (
-                        <>
-                          <div className={styles.financialGrid}>
-                            <div><span>Return reference</span><strong>{reservation.returnSummary.reference}</strong></div>
-                            <div><span>Actual return</span><strong>{reservation.returnSummary.actualReturnAt
-                              ? formatAgencyDateTime(reservation.returnSummary.actualReturnAt, reservation.agencyTimezone || 'Europe/Paris')
-                              : 'Not recorded'}</strong></div>
-                            <div><span>Deposit refunded</span><strong>{reservation.depositRefundedAmount ? `€${reservation.depositRefundedAmount}` : 'Processed'}</strong></div>
-                            {Number(reservation.depositRetainedAmount) > 0 && (
-                              <div><span>Damage deduction</span><strong style={{ color: 'var(--danger)' }}>€{reservation.depositRetainedAmount}</strong></div>
-                            )}
-                            <div><span>Settlement status</span><strong>{reservation.depositRefundStatus?.replaceAll('_', ' ') || 'Settled'}</strong></div>
-                            {reservation.depositRetentionReason && (
-                              <div style={{ gridColumn: 'span 2' }}><span>Adjustment reason</span><strong>{reservation.depositRetentionReason}</strong></div>
-                            )}
-                          </div>
-                          {reservation.stripeRefundId && <p>Stripe refund reference: <code>{reservation.stripeRefundId}</code></p>}
-                          {reservation.returnSummary.damages.length > 0 && (
-                            <div className={styles.financialHistory}>
-                              <h4>Inspection findings</h4>
-                              {reservation.returnSummary.damages.map((damage, index) => (
-                                <div key={`${damage.zone}-${index}`}>
-                                  <span>{damage.zone} · {damage.severity} · {damage.preExisting ? 'Previously recorded' : 'New finding'}</span>
-                                  <strong>{damage.description}</strong>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {reservation.returnSummary.charges.length > 0 && (
-                            <div className={styles.financialHistory}>
-                              <h4>Recorded return charges</h4>
-                              {reservation.returnSummary.charges.map((charge, index) => (
-                                <div key={`${charge.type}-${index}`}>
-                                  <span>{charge.type.replaceAll('_', ' ')} · {charge.description}</span>
-                                  <strong><Price value={charge.amount} /></strong>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <p>Available contracts, invoices and payment receipts are listed in your financial documents above.</p>
-                        </>
+                    {/* Media Column (Left) */}
+                    <div className={styles.cardMedia}>
+                      {vehicleImage ? (
+                        <img
+                          src={vehicleImage}
+                          alt={vName}
+                          className={styles.vehicleImage}
+                          loading="lazy"
+                        />
                       ) : (
-                        <p>Return inspection details are not available for this rental. Contact support if you need a copy.</p>
+                        <div
+                          style={{
+                            position: 'absolute',
+                            inset: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: '#12141a',
+                          }}
+                        >
+                          <Car size={64} style={{ color: 'var(--champagne-line)', opacity: 0.5 }} />
+                        </div>
                       )}
-                    </section>
-                  )}
+                      <div className={styles.imageOverlay} />
 
-                  {reservation.status === 'confirmed' && (
-                    <div className={styles.guaranteedBanner}>
-                      <span className={styles.guaranteedTag}>
-                        ✓ Guaranteed &amp; Paid · Ready for Collection
-                      </span>
-                      <h3 className={styles.guaranteedTitle}>
-                        Booking Confirmed &amp; Payment Verified
-                      </h3>
-                      <p className={styles.guaranteedText}>
-                        Your vehicle hold and security deposit are fully confirmed via Stripe. Scheduled collection starts {formatDate(reservation.pickupAt)}. No check-in codes or paperwork required.
-                      </p>
+                      <div className={styles.mediaTop}>
+                        <div className={styles.referenceBadge}>
+                          <span>{reservation.reservationNumber}</span>
+                        </div>
+
+                        <span className={`${styles.statusBadge} ${styles[statusMeta.tone]}`}>
+                          {statusMeta.label}
+                        </span>
+                      </div>
+
+                      <div className={styles.mediaBottom}>
+                        <p className={styles.vehicleBrand}>{brandName}</p>
+                        <h3 className={styles.vehicleModel}>{modelName}</h3>
+                        <span className={styles.vehicleCategory}>{categoryTag}</span>
+                      </div>
                     </div>
-                  )}
 
-                  <div className={styles.actionsRow}>
-                    <Link
-                      href={`/reservations/${encodeURIComponent(reservation.reservationNumber)}`}
-                      className={styles.trackButton}
-                    >
-                      Track Reservation &amp; Documents →
-                    </Link>
-                    {canCancel && (
-                      <button type="button" className={styles.cancelButton}
-                        disabled={busyNumber !== null}
-                        onClick={() => void handleCancel(reservation)}>
-                        {busyNumber === reservation.reservationNumber ? 'Cancelling...' : 'Cancel reservation'}
-                      </button>
-                    )}
+                    {/* Details & Actions Column (Right) */}
+                    <div className={styles.cardContent}>
+
+                      {/* Header with Dates */}
+                      <div className={styles.cardContentHeader}>
+                        <div className={styles.datesMeta}>
+                          <Calendar size={14} style={{ color: 'var(--champagne)' }} />
+                          <span>
+                            Booked on {formatDate(reservation.createdAt)}
+                          </span>
+                        </div>
+
+                        <span className={styles.activeFilterPill}>
+                          Category: {statusMeta.category}
+                        </span>
+                      </div>
+
+                      {/* Stepper Progress Bar */}
+                      <div className={styles.stepper} aria-label="Booking timeline">
+                        {stepInfo.stepLabels.map((label, idx) => {
+                          const stepNum = idx + 1;
+                          let stepState = '';
+                          if (stepInfo.isTerminalRejection && stepNum === stepInfo.currentStep) {
+                            stepState = styles.rejected;
+                          } else if (stepNum < stepInfo.currentStep) {
+                            stepState = styles.completed;
+                          } else if (stepNum === stepInfo.currentStep) {
+                            stepState = styles.current;
+                          }
+
+                          return (
+                            <div key={label} className={`${styles.stepItem} ${stepState}`}>
+                              <div className={styles.stepDot}>
+                                {stepInfo.isTerminalRejection && stepNum === stepInfo.currentStep ? (
+                                  '✕'
+                                ) : stepNum < stepInfo.currentStep ? (
+                                  '✓'
+                                ) : (
+                                  stepNum
+                                )}
+                              </div>
+                              <span className={styles.stepLabel}>{label}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Logistics Info Grid */}
+                      <div className={styles.infoGrid}>
+                        <div className={styles.infoItem}>
+                          <span className={styles.infoLabel}>
+                            <Calendar size={12} /> Pickup Date
+                          </span>
+                          <span className={styles.infoValue}>
+                            {formatDate(reservation.pickupAt)}
+                          </span>
+                          <span className={styles.infoSub}>
+                            {reservation.pickupLocation || 'Budapest Luxury Showroom'}
+                          </span>
+                        </div>
+
+                        <div className={styles.infoItem}>
+                          <span className={styles.infoLabel}>
+                            <Clock size={12} /> Return Date
+                          </span>
+                          <span className={styles.infoValue}>
+                            {formatDate(reservation.returnAt)}
+                          </span>
+                          <span className={styles.infoSub}>
+                            {reservation.dropoffLocation || 'Budapest Luxury Showroom'}
+                          </span>
+                        </div>
+
+                        <div className={styles.infoItem}>
+                          <span className={styles.infoLabel}>
+                            <MapPin size={12} /> Duration
+                          </span>
+                          <span className={styles.infoValue}>
+                            {reservation.rentalDays} {reservation.rentalDays === 1 ? 'Day' : 'Days'}
+                          </span>
+                          <span className={styles.infoSub}>
+                            Daily Rate: <Price value={reservation.dailyPrice} />
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Pricing Row */}
+                      <div className={styles.pricingRow}>
+                        <div className={styles.pricingBlock}>
+                          <span className={styles.pricingLabel}>Total Rental:</span>
+                          <span className={styles.pricingAmount}>
+                            <Price value={reservation.totalAmount} />
+                          </span>
+                        </div>
+
+                        <div className={styles.pricingBlock}>
+                          <span className={styles.pricingLabel}>Security Deposit:</span>
+                          <span className={styles.depositAmount}>
+                            <Price value={reservation.depositAmount} /> (Pre-authorization hold)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Contextual Status Callouts */}
+                      {isAwaitingPayment && (
+                        <div className={`${styles.callout} ${styles.urgent}`}>
+                          <div className={styles.calloutInfo}>
+                            <span className={styles.calloutTag}>Action Required · 24-Hour Guarantee Window</span>
+                            <h4 className={styles.calloutTitle}>Booking Approved by Concierge</h4>
+                            <p className={styles.calloutText}>
+                              Please finalize your payment and deposit hold to secure this vehicle.
+                              {reservation.paymentDeadlineAt && (
+                                <> Guarantee window expires: <strong>{formatDateTime(reservation.paymentDeadlineAt, reservation.agencyTimezone || 'Europe/Paris')}</strong>.</>
+                              )}
+                            </p>
+                          </div>
+                          <Link
+                            href={`/account/payments/${encodeURIComponent(reservation.reservationNumber)}`}
+                            className={styles.payNowCta}
+                          >
+                            <CreditCard size={14} /> Pay &amp; Guarantee Hold →
+                          </Link>
+                        </div>
+                      )}
+
+                      {isConfirmed && (
+                        <div className={`${styles.callout} ${styles.guaranteed}`}>
+                          <div className={styles.calloutInfo}>
+                            <span className={styles.calloutTag}>✓ Vehicle Guaranteed &amp; Reserved</span>
+                            <h4 className={styles.calloutTitle}>Confirmed · Ready for Handover</h4>
+                            <p className={styles.calloutText}>
+                              Your vehicle hold and security pre-authorization are officially registered. Collection starts {formatDate(reservation.pickupAt)} at the showroom.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className={styles.payNowCta}
+                            disabled={busyNumber === reservation.reservationNumber}
+                            onClick={() => void handleOnlineCheckIn(reservation, vName)}
+                          >
+                            <Key size={14} />
+                            {busyNumber === reservation.reservationNumber ? 'Issuing Pass...' : 'Showroom Check-In Pass'}
+                          </button>
+                        </div>
+                      )}
+
+                      {isActiveRental && (
+                        <div className={`${styles.callout} ${styles.activeRental}`}>
+                          <div className={styles.calloutInfo}>
+                            <span className={styles.calloutTag}>Active Rental · Vehicle In Custody</span>
+                            <h4 className={styles.calloutTitle}>Supercar Handed Over</h4>
+                            <p className={styles.calloutText}>
+                              Scheduled return is {formatDate(reservation.returnAt)}. Track mileage and inspection reports in your rental hub.
+                            </p>
+                          </div>
+                          <Link href="/account/rentals" className={styles.secondaryAction}>
+                            View My Rentals →
+                          </Link>
+                        </div>
+                      )}
+
+                      {isCompleted && (
+                        <div className={`${styles.callout} ${styles.completed}`}>
+                          <div className={styles.calloutInfo}>
+                            <span className={styles.calloutTag}>Rental Concluded</span>
+                            <h4 className={styles.calloutTitle}>Vehicle Successfully Returned</h4>
+                            <p className={styles.calloutText}>
+                              Inspection completed and security deposit reconciled.
+                              {reservation.depositRefundStatus === 'fully_refunded' && ' Full deposit refund released.'}
+                              {reservation.depositRefundStatus === 'partially_refunded' && ' Deposit partially released with retained deductions.'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {isRejected && (
+                        <div className={`${styles.callout} ${styles.urgent}`} style={{ borderColor: 'var(--danger-line)', background: 'var(--danger-bg)' }}>
+                          <div className={styles.calloutInfo}>
+                            <span className={styles.calloutTag} style={{ color: 'var(--danger-text)' }}>
+                              Booking Closed · {statusMeta.label}
+                            </span>
+                            <h4 className={styles.calloutTitle} style={{ color: 'var(--danger-text)' }}>
+                              Reservation Inactive
+                            </h4>
+                            <p className={styles.calloutText}>
+                              This booking has ended. No further charges or hold pre-authorizations apply to your account.
+                            </p>
+                          </div>
+                          <Link href="/vehicles" className={styles.secondaryAction}>
+                            Explore Fleet →
+                          </Link>
+                        </div>
+                      )}
+
+                      {/* Actions Row */}
+                      <div className={styles.actionsRow}>
+                        <div className={styles.actionButtonsGroup}>
+                          <Link
+                            href={`/reservations/${encodeURIComponent(reservation.reservationNumber)}`}
+                            className={styles.primaryAction}
+                          >
+                            <FileText size={14} /> View Booking Dossier →
+                          </Link>
+
+                          {/* Rental Agreement Modal Trigger */}
+                          {(isConfirmed || isActiveRental || isCompleted) && (
+                            <button
+                              type="button"
+                              className={styles.secondaryAction}
+                              onClick={() => handleOpenContract(reservation, vName, brandName, modelName, vehicleImage)}
+                            >
+                              <FileText size={14} /> Rental Agreement
+                            </button>
+                          )}
+
+                          
+                        </div>
+
+                        {canCancel && (
+                          <button
+                            type="button"
+                            className={styles.cancelAction}
+                            disabled={busyNumber === reservation.reservationNumber}
+                            onClick={() => void handleCancel(reservation)}
+                          >
+                            {busyNumber === reservation.reservationNumber ? 'Cancelling...' : 'Cancel Reservation'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </article>
               );
             })}
           </div>
         )}
-      </section>
+      </div>
+
+      {/* Luxury Rental Contract Document Modal */}
+      <RentalContractModal
+        isOpen={Boolean(activeContract)}
+        onClose={() => setActiveContract(null)}
+        contract={activeContract}
+      />
+
+      {/* Showroom Check-In Code Pass Modal */}
+      {checkinPass && (
+        <CheckInCodeModal
+          isOpen={Boolean(checkinPass)}
+          onClose={() => setCheckinPass(null)}
+          reservationNumber={checkinPass.reservationNumber}
+          vehicleName={checkinPass.vehicleName}
+          code={checkinPass.code}
+          expiresAt={checkinPass.expiresAt}
+          agencyName={checkinPass.agencyName}
+        />
+      )}
     </main>
   );
 }

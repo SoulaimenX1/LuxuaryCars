@@ -51,15 +51,15 @@ export default function AdminAvailabilityPage() {
   const [releaseReason, setReleaseReason] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    const abort = new AbortController();
+    let active = true;
     async function load() {
       setLoading(true);setError('');
       try {
         const [v,r,b,h] = await Promise.all([
-          fetch('/api/admin/vehicles', {cache:'no-store',signal:abort.signal}),
-          fetch('/api/admin/reservations', {cache:'no-store',signal:abort.signal}),
-          fetch(`/api/admin/availability?month=${encodeURIComponent(month)}`, {cache:'no-store',signal:abort.signal}),
-          fetch(`/api/admin/availability/history?month=${encodeURIComponent(month)}`, {cache:'no-store',signal:abort.signal}),
+          fetch('/api/admin/vehicles', {cache:'no-store'}),
+          fetch('/api/admin/reservations', {cache:'no-store'}),
+          fetch(`/api/admin/availability?month=${encodeURIComponent(month)}`, {cache:'no-store'}),
+          fetch(`/api/admin/availability/history?month=${encodeURIComponent(month)}`, {cache:'no-store'}),
         ]);
         if (!v.ok || !r.ok || !b.ok) throw new Error(`Unable to load availability calendar (HTTP ${[v.status,r.status,b.status].join('/')}).`);
         const vehicleData: unknown = await v.json();
@@ -70,7 +70,7 @@ export default function AdminAvailabilityPage() {
         const historyData: unknown = h.ok ? await h.json().catch(() => []) : [];
         if (typeof vehicleData !== 'object' || vehicleData === null || !('vehicles' in vehicleData) || !Array.isArray((vehicleData as Fleet).vehicles)
           || !Array.isArray(reservationData) || !Array.isArray(blocksData)) throw new Error('Invalid calendar response.');
-        if (abort.signal.aborted) return;
+        if (!active) return;
         const nextFleet = vehicleData as Fleet;
         setFleet(nextFleet);
         setVehicleId((current) => nextFleet.vehicles.some((item) => item.id === current) ? current : nextFleet.vehicles[0]?.id ?? '');
@@ -78,10 +78,10 @@ export default function AdminAvailabilityPage() {
         setBlocks(blocksData as Block[]);
         setHistory(Array.isArray(historyData) ? historyData as AuditBlock[] : []);
       } catch (caught) {
-        if (!abort.signal.aborted) setError(caught instanceof Error ? caught.message : 'Unable to load calendar.');
-      } finally {if (!abort.signal.aborted) setLoading(false);}
+        if (active) setError(caught instanceof Error ? caught.message : 'Unable to load calendar.');
+      } finally {if (active) setLoading(false);}
     }
-    void load(); return () => abort.abort();
+    void load(); return () => { active = false; };
   }, [month, refresh]);
   const vehicleName = (vehicle: Vehicle) => {
     const model = fleet.models.find((item) => item.id === vehicle.modelId);
@@ -110,7 +110,7 @@ export default function AdminAvailabilityPage() {
     const maintenance = blocks.find((b) => b.vehicleId === vehicle.id && Date.parse(b.startsAt) < end && Date.parse(b.endsAt) > start);
     if (maintenance) return {type:'unavailable',description:maintenance.reason};
     const booking = reservations.find((r) => r.vehicleId === vehicle.id &&
-      ['pending','confirmed','converted'].includes(r.status) && Date.parse(r.pickupAt) < end && Date.parse(r.returnAt) > start);
+      ['pending','awaiting_payment','confirmed','active_rental','converted'].includes(r.status) && Date.parse(r.pickupAt) < end && Date.parse(r.returnAt) > start);
     if (booking) return {type:'reserved',description:`${booking.reservationNumber} (${booking.status})`};
     return {type:'available',description:'Available'};
   };
@@ -216,10 +216,8 @@ export default function AdminAvailabilityPage() {
   return <main className={styles.page}>
     <Link href="/admin" className={styles.back}>← Back to dashboard</Link>
     <header className={styles.hero}>
-      <p className={styles.eyebrow}>ADMINISTRATOR MANAGEMENT</p>
       <h1 className={styles.title}>Vehicle availability calendar</h1>
-      <p className={styles.intro}>Review confirmed and pending reservations, vehicle maintenance and available days.</p>
-    </header>
+      </header>
     <div className={styles.controls}>
       <label>Vehicle<select value={vehicleId} onChange={(e)=>{setVehicleId(e.target.value);resetForm();}}>
         {fleet.vehicles.map((item)=><option key={item.id} value={item.id}>{vehicleName(item)}</option>)}

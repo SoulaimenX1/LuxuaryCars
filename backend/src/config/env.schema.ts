@@ -10,6 +10,15 @@ const optionalSecretString = z.preprocess(
     z.string().min(1).optional(),
 );
 
+const optionalEncryptionKeyString = z.preprocess(
+    (val) => (typeof val === 'string' && val.trim() === '' ? undefined : val),
+    z
+        .string()
+        .trim()
+        .min(32, 'EMAIL_OUTBOX_ENCRYPTION_KEY must be at least 32 characters')
+        .optional(),
+);
+
 const booleanFromEnv = z.preprocess((val) => {
     if (typeof val === 'boolean') return val;
     if (typeof val === 'string') {
@@ -114,6 +123,28 @@ export const envSchema = z
             .max(60000)
             .default(10000),
 
+        // Local Mailpit SMTP override (development/test only; preserves SMTP_* Gmail credentials)
+        MAILPIT_ENABLED: booleanFromEnv.default(false),
+
+        MAILPIT_SMTP_HOST: z
+            .string()
+            .trim()
+            .min(1)
+            .default('127.0.0.1'),
+
+        MAILPIT_SMTP_PORT: z.coerce
+            .number()
+            .int()
+            .min(1)
+            .max(65535)
+            .default(1025),
+
+        MAILPIT_HTTP_URL: z
+            .string()
+            .trim()
+            .min(1)
+            .default('http://127.0.0.1:8025'),
+
         EMAIL_OUTBOX_MAX_ATTEMPTS: z.coerce
             .number()
             .int()
@@ -134,6 +165,8 @@ export const envSchema = z
             .min(1000)
             .max(3600000)
             .default(30000),
+
+        EMAIL_OUTBOX_ENCRYPTION_KEY: optionalEncryptionKeyString,
 
         // JWT authentication & token lifetimes
         JWT_SECRET: z
@@ -170,6 +203,15 @@ export const envSchema = z
             .max(300)
             .default(300),
 
+        // WebAuthn / Passkeys configuration
+        WEBAUTHN_RP_ID: z.string().trim().min(1).default('localhost'),
+        WEBAUTHN_RP_NAME: z.string().trim().min(1).default('LUXUAR Car Rental'),
+        WEBAUTHN_ORIGIN: z.string().trim().min(1).default('http://localhost:3000'),
+
+        // Feature flags
+        ENABLE_DYNAMIC_PRICING: booleanFromEnv.default(false),
+        ENABLE_PREDICTIVE_ANALYTICS: booleanFromEnv.default(false),
+
         // Stripe Checkout configuration
         STRIPE_SECRET_KEY: optionalSecretString,
         STRIPE_WEBHOOK_SECRET: optionalSecretString,
@@ -183,6 +225,18 @@ export const envSchema = z
                 code: z.ZodIssueCode.custom,
                 path: ['SMTP_PASSWORD'],
                 message: 'Both SMTP_USER and SMTP_PASSWORD must be provided together when SMTP authentication is enabled',
+            });
+        }
+        if (
+            env.MAILPIT_ENABLED &&
+            !['127.0.0.1', 'localhost', '::1'].includes(
+                env.MAILPIT_SMTP_HOST.trim().toLowerCase(),
+            )
+        ) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['MAILPIT_SMTP_HOST'],
+                message: 'MAILPIT_SMTP_HOST must be bound to localhost (127.0.0.1, localhost, or ::1)',
             });
         }
     });

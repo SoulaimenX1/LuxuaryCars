@@ -389,6 +389,120 @@ describe('FinanceService state changes', () => {
     expect(duplicateTx?.integrityStatus).toBe('FAILED_REJECTED');
     expect(duplicateTx?.isDuplicate).toBe(true);
   });
+
+  it('generates a strict 1-page commercial rental invoice document via document()', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM rentals l') && sql.includes('JOIN reservations r')) {
+        return [{
+          id: 'rental-1',
+          reservationId: 'res-1',
+          status: 'active',
+          customerId: 'cust-1',
+          reservationNumber: 'RES-2026-000001',
+          contractNumber: 'CTR-2026-000001',
+          dailyPrice: '1500.00',
+          rentalDays: 3,
+          vehicleId: 'veh-1',
+          licensePlate: 'P-911-GT',
+          vin: 'WP0ZZZ99ZTS392001',
+          vehicleCategory: 'Supercar',
+          brandName: 'Porsche',
+          modelName: '911 GT3 RS',
+          pickupLocation: 'Budapest Flagship Showroom',
+          dropoffLocation: 'Budapest Flagship Showroom',
+          customerEmail: 'alex@example.com',
+          customerPhone: '+36 30 555 1234',
+          totalAmount: '4500.00',
+          depositAmount: '6000.00',
+          vehicleName: 'Porsche 911 GT3 RS',
+          customerName: 'Alexander Vance',
+          pickupAt: new Date('2026-11-10T10:00:00Z'),
+          returnAt: new Date('2026-11-13T10:00:00Z'),
+        }];
+      }
+      if (sql.includes('FROM invoices') && sql.includes('WHERE rental_id')) {
+        return [{
+          id: 'inv-1',
+          invoiceNumber: 'INV-2026-000001',
+          subtotal: '3543.31',
+          taxRate: '27.00',
+          taxAmount: '956.69',
+          totalAmount: '4500.00',
+          issuedAt: new Date('2026-11-10T10:00:00Z'),
+        }];
+      }
+      if (sql.includes('FROM payments') && sql.includes('WHERE reservation_id')) {
+        return [{
+          id: 'pay-1',
+          type: 'rental_payment',
+          method: 'card',
+          amount: '4500.00',
+          currency: 'EUR',
+          paidAt: new Date('2026-11-10T09:00:00Z'),
+          reference: 'pi_test123',
+          provider: 'stripe',
+        }];
+      }
+      return [];
+    });
+    const service = new FinanceService({ query } as never);
+    const pdfBuffer = await service.document('rental-1', 'invoice');
+    expect(Buffer.isBuffer(pdfBuffer)).toBe(true);
+    const pdfStr = pdfBuffer.toString('latin1');
+    expect(pdfStr).toContain('/Count 1');
+    expect(pdfStr).toContain('(Page 1 of 1)');
+    expect(pdfStr).toContain('(COMMERCIAL RENTAL INVOICE)');
+    expect(pdfStr).toContain('(INV-2026-000001)');
+    expect(pdfStr).toContain('EUR 4500.00');
+    expect(pdfStr).toContain('EUR 6000.00');
+    expect(pdfStr).toContain('NOT RENTAL REVENUE');
+  });
+
+  it('generates a strict 2-page rental agreement document via document()', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (sql.includes('FROM rentals l') && sql.includes('JOIN reservations r')) {
+        return [{
+          id: 'rental-1',
+          reservationId: 'res-1',
+          status: 'active',
+          customerId: 'cust-1',
+          reservationNumber: 'RES-2026-000001',
+          contractNumber: 'CTR-2026-000001',
+          dailyPrice: '1500.00',
+          rentalDays: 3,
+          vehicleId: 'veh-1',
+          licensePlate: 'P-911-GT',
+          vin: 'WP0ZZZ99ZTS392001',
+          vehicleCategory: 'Supercar',
+          brandName: 'Porsche',
+          modelName: '911 GT3 RS',
+          pickupLocation: 'Budapest Flagship Showroom',
+          dropoffLocation: 'Budapest Flagship Showroom',
+          customerEmail: 'alex@example.com',
+          customerPhone: '+36 30 555 1234',
+          totalAmount: '4500.00',
+          depositAmount: '6000.00',
+          vehicleName: 'Porsche 911 GT3 RS',
+          customerName: 'Alexander Vance',
+          pickupAt: new Date('2026-11-10T10:00:00Z'),
+          returnAt: new Date('2026-11-13T10:00:00Z'),
+        }];
+      }
+      return [];
+    });
+    const service = new FinanceService({ query } as never);
+    const pdfBuffer = await service.document('rental-1', 'contract');
+    expect(Buffer.isBuffer(pdfBuffer)).toBe(true);
+    const pdfStr = pdfBuffer.toString('latin1');
+    expect(pdfStr).toContain('/Count 2');
+    expect(pdfStr).toContain('(Page 1 of 2)');
+    expect(pdfStr).toContain('(Page 2 of 2)');
+    expect(pdfStr).toContain('(OFFICIAL RENTAL AGREEMENT)');
+    expect(pdfStr).toContain('(CTR-2026-000001)');
+    expect(pdfStr).toContain('(TERMS OF CUSTODY, VEHICLE CARE & SIGNATURES)');
+    expect(pdfStr).toContain('(SHOWROOM)');
+    expect(pdfStr).toContain('(VALIDATION)');
+  });
 });
 
 function reservationInfo() {

@@ -1,4 +1,3 @@
-
 import {
     Column,
     Entity,
@@ -6,7 +5,7 @@ import {
 } from 'typeorm';
 
 // Cette entité représente une marque automobile.
-// Exemple : Porsche, BMW ou Mercedes-Benz.
+// Exemple : Porsche, Ferrari ou Rolls-Royce.
 
 @Entity('brands')
 export class Brand {
@@ -22,4 +21,12 @@ export class Brand {
         type: 'varchar',
     })
     name!: string;
+
+    // URL ou chemin du logo officiel de la marque (ex. /brands/ferrari-logo.svg)
+    @Column({
+        name: 'logo_url',
+        type: 'varchar',
+        nullable: true,
+    })
+    logoUrl!: string | null;
 }
